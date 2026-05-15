@@ -335,6 +335,7 @@ export async function renderVideo(
 
   // Encode Audio
   const samplesPerChunk = 2048;
+  let chunkCount = 0;
   for (let i = 0; i < audioBuffer.length; i += samplesPerChunk) {
     const chunkLength = Math.min(samplesPerChunk, audioBuffer.length - i);
     const data = new Float32Array(chunkLength * audioBuffer.numberOfChannels);
@@ -352,6 +353,12 @@ export async function renderVideo(
     });
     audioEncoder.encode(audioData);
     audioData.close();
+    
+    chunkCount++;
+    if (chunkCount % 500 === 0) {
+      if (onProgress) onProgress(Math.floor((i / audioBuffer.length) * 20)); // Audio takes 0-20%
+      await new Promise(r => setTimeout(r, 0));
+    }
   }
   await audioEncoder.flush();
 
@@ -395,8 +402,9 @@ export async function renderVideo(
     videoEncoder.encode(videoFrame, { keyFrame: frame % 60 === 0 });
     videoFrame.close();
 
-    if (frame % 30 === 0 && onProgress) {
-      onProgress(Math.floor((frame / totalFrames) * 100));
+    if (frame % 30 === 0) {
+      if (onProgress) onProgress(20 + Math.floor((frame / totalFrames) * 80));
+      await new Promise(r => setTimeout(r, 0));
     }
   }
 
