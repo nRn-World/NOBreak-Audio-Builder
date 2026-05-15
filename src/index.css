@@ -35,3 +35,27 @@
   background-size: 200% auto;
   animation: shimmer-reverse 6s linear infinite;
 }
+
+/* Custom Webkit Scrollbar to match dark theme */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A0B0E;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e2230;
+  border-radius: 6px;
+  border: 3px solid #0A0B0E;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #31374a;
+}
+
+::-webkit-scrollbar-corner {
+  background: #0A0B0E;
+}
