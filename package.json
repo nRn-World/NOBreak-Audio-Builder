@@ -1,7 +1,7 @@
 {
   "name": "nobreak-audio-builder",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Professional audio mixing and merging tool for Windows",
   "license": "SEE LICENSE IN LICENSE.txt",
   "author": {
@@ -59,7 +59,7 @@
     },
     "win": {
       "icon": "public/logo.png",
-      "artifactName": "NoBreak-Audio-Builder-Setup-${version}.${ext}",
+      "artifactName": "NoBreak-Audio-Builder-${version}-windows.${ext}",
       "target": [
         "nsis",
         "zip"
@@ -67,6 +67,7 @@
     },
     "mac": {
       "icon": "public/logo.png",
+      "artifactName": "NoBreak-Audio-Builder-${version}-mac.${ext}",
       "target": [
         "dmg",
         "zip"
@@ -74,6 +75,7 @@
     },
     "linux": {
       "icon": "public/logo.png",
+      "artifactName": "NoBreak-Audio-Builder-${version}-linux.${ext}",
       "target": [
         "AppImage",
         "deb"
