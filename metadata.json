@@ -1,0 +1,6 @@
+{
+  "name": "NoBreak Audio Builder",
+  "description": "Professional audio mixing and merging tool. Combine multiple tracks with seamless crossfades, volume normalization, and custom fade transitions. Export to high-quality MP3 or WAV.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

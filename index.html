@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NoBreak Audio Builder</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+    <script src="https://unpkg.com/mp4-muxer@3.3.0/build/mp4-muxer.mjs" type="module"></script>
+    <script>
+      // Fallback for non-module global access if needed, but we'll try to import it properly
+      window.Mp4MuxerLoaded = true;
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

@@ -1,0 +1,84 @@
+{
+  "name": "nobreak-audio-builder",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Professional audio mixing and merging tool for Windows",
+  "author": {
+    "name": "nRn World",
+    "email": "bynrnworld@gmail.com"
+  },
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "dev:electron": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://127.0.0.1:3000 && electron .\"",
+    "build:electron": "npm run build && electron-builder --win",
+    "build:electron:zip": "npm run build && electron-builder --win zip"
+  },
+  "dependencies": {
+    "@google/genai": "^1.29.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-react": "^5.0.4",
+    "dotenv": "^17.2.3",
+    "electron-updater": "^6.8.3",
+    "lamejs": "^1.2.1",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "mp4-muxer": "^5.2.2",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "vite": "^6.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^42.1.0",
+    "electron-builder": "^26.8.1",
+    "esbuild": "^0.25.0",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3",
+    "wait-on": "^9.0.10"
+  },
+  "build": {
+    "appId": "com.nobreak.audiobuilder",
+    "productName": "NoBreak Audio Builder",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "icon": "public/logo.png",
+      "artifactName": "NoBreak-Audio-Builder-Setup-${version}.${ext}",
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NoBreak Audio Builder"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "node_modules/**/*",
+      "public/logo.png"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "nRn-World",
+      "repo": "NoBreak-Audio-Builder"
+    }
+  }
+}
