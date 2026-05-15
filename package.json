@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "Professional audio mixing and merging tool for Windows",
+  "license": "SEE LICENSE IN LICENSE.txt",
   "author": {
     "name": "nRn World",
     "email": "bynrnworld@gmail.com"
@@ -67,13 +68,15 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "NoBreak Audio Builder"
+      "shortcutName": "NoBreak Audio Builder",
+      "license": "LICENSE.txt"
     },
     "files": [
       "dist/**/*",
       "electron/**/*",
       "node_modules/**/*",
-      "public/logo.png"
+      "public/logo.png",
+      "LICENSE.txt"
     ],
     "publish": {
       "provider": "github",

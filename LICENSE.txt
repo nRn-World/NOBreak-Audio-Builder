@@ -1,0 +1,373 @@
+================================================================================
+           NOBREAK AUDIO BUILDER — SLUTANVÄNDARAVTAL (EULA)
+              End-User License Agreement (EULA)
+================================================================================
+
+Programvara:      NoBreak Audio Builder
+Upphovsrättsman:  nRn World
+Kontakt:          bynrnworld@gmail.com
+Version:          1.0 och alla framtida versioner
+
+Senast uppdaterad: 2026-05-15
+
+================================================================================
+VIKTIGT — LÄS NOGGRANT INNAN DU LADDAR NED, INSTALLERAR ELLER ANVÄNDER
+PROGRAMVARAN. GENOM ATT LADDA NED, INSTALLERA ELLER ANVÄNDA PROGRAMVARAN
+GODKÄNNER DU SAMTLIGA VILLKOR I DETTA AVTAL. OM DU INTE GODKÄNNER VILLKOREN
+ÄR DU INTE BERÄTTIGAD ATT ANVÄNDA PROGRAMVARAN OCH MÅSTE TA BORT DEN
+OMEDELBART.
+================================================================================
+
+
+════════════════════════════════════════════════════════════════════════════════
+DEL I — SVENSK VERSION
+════════════════════════════════════════════════════════════════════════════════
+
+§ 1. UPPHOVSRÄTT OCH ÄGARSKAP
+──────────────────────────────
+NoBreak Audio Builder, inklusive men inte begränsat till all källkod, design,
+logotyper, grafik, ljud, text, funktioner, algoritmer, dokumentation och
+tillhörande material (nedan "Programvaran"), är exklusiv egendom tillhörande
+nRn World och skyddas av upphovsrättslagen (lag 1960:729), varumärkeslagen
+(lag 2010:1877) samt tillämpliga internationella upphovsrättskonventioner,
+inklusive Bernkonventionen och WIPO Copyright Treaty.
+
+Alla rättigheter som inte uttryckligen beviljas i detta avtal är förbehållna
+upphovsrättsmannen.
+
+
+§ 2. BEVILJAD LICENS — VAD DU FÅR GÖRA
+────────────────────────────────────────
+Under förutsättning att du fullt ut uppfyller villkoren i detta avtal beviljar
+nRn World dig en personlig, icke-exklusiv, icke-överlåtbar och återkallelig
+licens att:
+
+  a) Ladda ned och installera en (1) kopia av Programvaran på din personliga
+     dator för eget, privat och icke-kommersiellt bruk.
+
+  b) Använda Programvaran i utbildningssyfte, inklusive som student vid en
+     utbildningsinstitution eller som privatperson som självständigt lär sig
+     digital ljudproduktion.
+
+  c) Dela en oförändrad kopia av installationsfilen GRATIS med vänner,
+     familjemedlemmar eller studiekamrater, under förutsättning att:
+       – Ingen ersättning, betalning, donation eller förmån av något slag
+         begärs, mottas eller förväntas i samband med delningen.
+       – Detta licensavtal (LICENSE.txt) alltid medföljer och presenteras
+         för mottagaren.
+       – Mottagaren informeras om att de är bundna av detta avtal.
+
+
+§ 3. FÖRBUD — VAD DU INTE FÅR GÖRA
+─────────────────────────────────────
+Följande handlingar är STRIKT FÖRBJUDNA och utgör ett brott mot detta avtal
+samt tillämplig lagstiftning:
+
+  3.1  KOMMERSIELL ANVÄNDNING
+       Du får inte, direkt eller indirekt:
+       – Sälja, hyra ut, licensera vidare, leasa eller på annat sätt överlåta
+         Programvaran eller delar därav mot betalning eller annan ersättning.
+       – Använda Programvaran som en del av en tjänst, produkt eller process
+         som genererar intäkter, vinst eller ekonomisk fördel av något slag.
+       – Använda Programvaran inom ramen för yrkesmässig verksamhet, konsultation
+         eller professionell service utan föregående skriftligt godkännande.
+
+  3.2  MARKNADSFÖRING OCH REKLAM
+       Du får inte:
+       – Tjäna pengar på reklam, sponsrat innehåll, affiliateprogram, affiliate-
+         länkar, donationslänkar eller liknande monetiseringsformer i samband
+         med publicering av innehåll som skapats med eller handlar om Programvaran.
+       – Använda Programvaran i YouTube-videor, livestreamer, sociala medieinlägg
+         eller podcasts vars primära syfte är att generera annonsinkomster eller
+         sponsorersättning, utan föregående skriftligt tillstånd.
+
+  3.3  MODIFIERING OCH DEKOMPILERING
+       Du får inte:
+       – Modifiera, ändra, anpassa, översätta eller skapa bearbetningar av
+         Programvaran eller dess källkod, design, gränssnitt eller funktionalitet.
+       – Byta namn på Programvaran, ändra logotyper, varumärken, färger, teckensnitt
+         eller annat visuellt identifieringsmaterial.
+       – Dekompilera, disassemblera, reverse engineera eller på annat sätt försöka
+         utröna Programvarans källkod eller underliggande algoritmer.
+       – Ta bort, dölja, ändra eller förstöra copyright-meddelanden, vattenstämplar,
+         attributioner eller licenstexter som ingår i Programvaran.
+
+  3.4  OMFÖRDELNING OCH DISTRIBUTION
+       Du får inte:
+       – Distribuera Programvaran via appbutiker, nedladdningssidor, torrent-
+         sidor, fildelningsnätverk eller liknande plattformar utan uttryckligt
+         skriftligt tillstånd.
+       – Bunta ihop Programvaran med annan programvara, produkter eller tjänster
+         och distribuera det som ett paket.
+       – Skapa ett eget program, applikation eller tjänst som är baserad på,
+         härledd från eller väsentligen liknar Programvaran.
+
+  3.5  FÖRETAG OCH ORGANISATIONER
+       Juridiska personer (företag, föreningar, myndigheter m.fl.) får inte
+       använda Programvaran utan ett separat, skriftligt kommersiellt licensavtal
+       med nRn World. Kontakta bynrnworld@gmail.com för offert.
+
+
+§ 4. ANSVARSBEGRÄNSNING OCH FRISKRIVNING
+──────────────────────────────────────────
+PROGRAMVARAN TILLHANDAHÅLLS "I BEFINTLIGT SKICK" ("AS IS") UTAN GARANTIER AV
+NÅGOT SLAG, VARE SIG UTTRYCKLIGA ELLER UNDERFÖRSTÅDDA. NRN WORLD LÄMNAR INGA
+GARANTIER AVSEENDE PROGRAMMETS DRIFTSÄKERHET, FELFRIHET, LÄMPLIGHET FÖR ETT
+VISST ÄNDAMÅL ELLER ATT DET INTE INKRÄKTAR PÅ TREDJE PARTS RÄTTIGHETER.
+
+ANSVARSBEGRÄNSNING — SKADADE FILER OCH DATAFÖRT:
+I den maximalt tillåtna utsträckning som tillämplig lagstiftning medger skall
+nRn World inte under några omständigheter hållas ansvarig för:
+
+  – Förlust, radering, korruption eller skada på filer, data, musik, projekt
+    eller annan information som lagras på användarens dator eller anslutna
+    enheter, oavsett om sådan skada uppstår på grund av Programvarans funktion,
+    krasch, bugg, inkompatibilitet, systemfel eller annan orsak.
+
+  – Skada på operativsystem, drivrutiner, systemprogramvara, hårdvara eller
+    annan programvara till följd av installation, körning eller avinstallation
+    av Programvaran.
+
+  – Indirekta skador, följdskador, oförutsedda skador, utebliven vinst eller
+    ekonomisk förlust av något slag som uppstår i samband med användning av
+    Programvaran, oavsett om nRn World har informerats om risken för sådana
+    skador.
+
+Användaren använder Programvaran på EGET ANSVAR och rekommenderas att
+regelbundet säkerhetskopiera alla viktiga filer till en extern enhet eller
+molntjänst.
+
+
+§ 5. KONTAKT FÖR TILLSTÅND
+────────────────────────────
+All användning som inte uttryckligen tillåts i § 2 kräver ett separat,
+skriftligt tillstånd från nRn World. Kontakta:
+
+  E-post:  bynrnworld@gmail.com
+
+Tillstånd betraktas inte som beviljat förrän ett skriftligt svar mottagits
+och signerats av nRn World.
+
+
+§ 6. AVTALSBROTT OCH RÄTTSLIGA PÅFÖLJDER
+──────────────────────────────────────────
+Varje handling som bryter mot detta avtal, inklusive men inte begränsat till
+kommersiell användning, modifiering, obehörig distribution eller plagiat, kan
+leda till:
+
+  a) Omedelbar och automatisk återkallelse av den licens som beviljats härunder.
+  b) Civilrättsligt skadeståndskrav i enlighet med upphovsrättslagen (1960:729)
+     och lagen om immaterialrättsliga skador.
+  c) Straffrättslig anmälan vid upphovsrättsbrott enligt 7 kap.
+     upphovsrättslagen.
+  d) Rättsliga åtgärder vid behörig domstol i Sverige, samt vid behov i det
+     land där intrånget begicks i enlighet med Bernkonventionen och TRIPS-
+     avtalet.
+
+nRn World förbehåller sig rätten att vidta rättsliga åtgärder i alla
+jurisdiktioner där intrång begångits.
+
+
+§ 7. TILLÄMPLIG LAG OCH JURISDIKTION
+───────────────────────────────────────
+Detta avtal regleras av och tolkas i enlighet med svensk rätt. Tvister som
+uppstår med anledning av detta avtal skall i första hand lösas genom
+förhandling. Om förhandling misslyckas skall tvisten avgöras av behörig
+allmän domstol i Sverige.
+
+
+§ 8. ÄNDRINGAR AV AVTALET
+──────────────────────────
+nRn World förbehåller sig rätten att när som helst ändra villkoren i detta
+avtal. Ändringar träder i kraft när de publiceras på programmets officiella
+nedladdningssida eller i en ny version av Programvaran. Fortsatt användning
+av Programvaran efter publicering av ändrade villkor innebär att du accepterar
+de nya villkoren.
+
+
+§ 9. AVTALETS FULLSTÄNDIGHET OCH OGILTIGA BESTÄMMELSER
+────────────────────────────────────────────────────────
+Detta avtal utgör den fullständiga överenskommelsen mellan dig och nRn World
+avseende Programvaran och ersätter alla tidigare muntliga eller skriftliga
+avtal i ämnet. Om en bestämmelse i detta avtal befinns ogiltig eller omöjlig
+att verkställa skall denna bestämmelse ändras i minsta möjliga utsträckning
+för att göra den verkställbar, och övriga bestämmelser i avtalet skall
+förbli i full kraft och verkan.
+
+
+════════════════════════════════════════════════════════════════════════════════
+PART II — ENGLISH VERSION (Binding International Version)
+════════════════════════════════════════════════════════════════════════════════
+
+§ 1. COPYRIGHT AND OWNERSHIP
+──────────────────────────────
+NoBreak Audio Builder, including but not limited to all source code, design,
+logos, graphics, audio, text, features, algorithms, documentation and related
+materials (hereinafter "the Software"), is the exclusive property of nRn World
+and is protected under the Swedish Copyright Act (SFS 1960:729), the Swedish
+Trademark Act (SFS 2010:1877), and applicable international copyright
+conventions, including the Berne Convention and the WIPO Copyright Treaty.
+
+All rights not expressly granted in this Agreement are reserved by the
+copyright holder.
+
+
+§ 2. GRANT OF LICENSE — PERMITTED USES
+────────────────────────────────────────
+Subject to full compliance with the terms of this Agreement, nRn World grants
+you a personal, non-exclusive, non-transferable and revocable license to:
+
+  a) Download and install one (1) copy of the Software on your personal
+     computer for personal, private and non-commercial use only.
+
+  b) Use the Software for educational purposes, including as a student at an
+     educational institution or as a private individual self-educating in
+     digital audio production.
+
+  c) Share an unmodified copy of the installation file FREE OF CHARGE with
+     friends, family members or fellow students, provided that:
+       – No compensation, payment, donation or benefit of any kind is
+         requested, received or expected in connection with the sharing.
+       – This License Agreement (LICENSE.txt) always accompanies and is
+         presented to the recipient.
+       – The recipient is informed that they are bound by this Agreement.
+
+
+§ 3. RESTRICTIONS — PROHIBITED USES
+──────────────────────────────────────
+The following actions are STRICTLY PROHIBITED and constitute a breach of this
+Agreement and applicable law:
+
+  3.1  COMMERCIAL USE
+       You may not, directly or indirectly:
+       – Sell, rent, sub-license, lease or otherwise transfer the Software or
+         any part thereof for payment or other compensation.
+       – Use the Software as part of a service, product or process that generates
+         revenue, profit or economic benefit of any kind.
+       – Use the Software within the framework of professional activity,
+         consulting or professional service without prior written consent.
+
+  3.2  MONETIZATION AND ADVERTISING
+       You may not:
+       – Earn money through advertising, sponsored content, affiliate programs,
+         affiliate links, donation links or similar monetization methods in
+         connection with publishing content created with or about the Software.
+       – Use the Software in YouTube videos, livestreams, social media posts or
+         podcasts whose primary purpose is to generate advertising revenue or
+         sponsorship compensation, without prior written permission.
+
+  3.3  MODIFICATION AND REVERSE ENGINEERING
+       You may not:
+       – Modify, alter, adapt, translate or create derivative works of the
+         Software or its source code, design, interface or functionality.
+       – Rename the Software, change logos, trademarks, colors, fonts or other
+         visual identification material.
+       – Decompile, disassemble, reverse engineer or otherwise attempt to
+         derive the Software's source code or underlying algorithms.
+       – Remove, obscure, alter or destroy copyright notices, watermarks,
+         attributions or license texts included in the Software.
+
+  3.4  REDISTRIBUTION AND DISTRIBUTION
+       You may not:
+       – Distribute the Software through app stores, download sites, torrent
+         sites, file-sharing networks or similar platforms without explicit
+         written permission.
+       – Bundle the Software with other software, products or services and
+         distribute it as a package.
+       – Create your own program, application or service that is based on,
+         derived from or substantially resembles the Software.
+
+  3.5  CORPORATE AND ORGANIZATIONAL USE
+       Legal entities (companies, associations, authorities, etc.) may not use
+       the Software without a separate, written commercial license agreement
+       with nRn World. Contact bynrnworld@gmail.com for a quote.
+
+
+§ 4. DISCLAIMER OF WARRANTIES AND LIMITATION OF LIABILITY
+───────────────────────────────────────────────────────────
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND, EITHER
+EXPRESS OR IMPLIED. NRN WORLD MAKES NO WARRANTIES REGARDING THE SOFTWARE'S
+RELIABILITY, ERROR-FREE OPERATION, FITNESS FOR A PARTICULAR PURPOSE OR NON-
+INFRINGEMENT OF THIRD-PARTY RIGHTS.
+
+DISCLAIMER — DAMAGED FILES AND DATA LOSS:
+To the maximum extent permitted by applicable law, nRn World shall under no
+circumstances be held liable for:
+
+  – Loss, deletion, corruption or damage to files, data, music, projects or
+    other information stored on the user's computer or connected devices,
+    regardless of whether such damage arises from the Software's operation,
+    crash, bug, incompatibility, system failure or other cause.
+
+  – Damage to the operating system, drivers, system software, hardware or
+    other software as a result of installing, running or uninstalling the
+    Software.
+
+  – Indirect damages, consequential damages, incidental damages, loss of
+    profit or financial loss of any kind arising in connection with the use
+    of the Software, even if nRn World has been informed of the risk of such
+    damages.
+
+The user uses the Software AT THEIR OWN RISK and is strongly advised to
+regularly back up all important files to an external drive or cloud service.
+
+
+§ 5. CONTACT FOR PERMISSIONS
+──────────────────────────────
+All use not expressly permitted under § 2 requires a separate, written
+permission from nRn World. Contact:
+
+  Email:  bynrnworld@gmail.com
+
+Permission is not considered granted until a written response has been
+received and acknowledged by nRn World.
+
+
+§ 6. BREACH AND LEGAL CONSEQUENCES
+─────────────────────────────────────
+Any action that violates this Agreement, including but not limited to commercial
+use, modification, unauthorized distribution or plagiarism, may result in:
+
+  a) Immediate and automatic revocation of the license granted hereunder.
+  b) Civil damages claims in accordance with the Swedish Copyright Act and
+     the law on intellectual property damages.
+  c) Criminal complaint for copyright infringement under Chapter 7 of the
+     Swedish Copyright Act.
+  d) Legal action before a competent court in Sweden, and where necessary,
+     in the country where the infringement occurred pursuant to the Berne
+     Convention and the TRIPS Agreement.
+
+nRn World reserves the right to pursue legal action in all jurisdictions
+where infringement has occurred.
+
+
+§ 7. GOVERNING LAW AND JURISDICTION
+──────────────────────────────────────
+This Agreement is governed by and construed in accordance with Swedish law.
+Disputes arising out of this Agreement shall primarily be resolved through
+negotiation. If negotiation fails, the dispute shall be settled by a competent
+court of general jurisdiction in Sweden.
+
+
+§ 8. AMENDMENTS TO THIS AGREEMENT
+────────────────────────────────────
+nRn World reserves the right to modify the terms of this Agreement at any
+time. Amendments take effect when published on the Software's official download
+page or in a new version of the Software. Continued use of the Software after
+publication of amended terms constitutes acceptance of the new terms.
+
+
+§ 9. ENTIRE AGREEMENT AND SEVERABILITY
+─────────────────────────────────────────
+This Agreement constitutes the entire agreement between you and nRn World
+regarding the Software and supersedes all prior oral or written agreements on
+the subject. If any provision of this Agreement is found to be invalid or
+unenforceable, that provision shall be amended to the minimum extent necessary
+to make it enforceable, and the remaining provisions of this Agreement shall
+remain in full force and effect.
+
+
+================================================================================
+Copyright © 2026 nRn World. Alla rättigheter förbehållna / All rights reserved.
+Kontakt / Contact: bynrnworld@gmail.com
+================================================================================
