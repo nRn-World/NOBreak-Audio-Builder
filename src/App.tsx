@@ -399,7 +399,10 @@ export default function App() {
       const depth = globalSettings.bitDepth || 16;
       bytesPerSec = 44100 * (depth / 8) * 2; 
     } else if (globalSettings.format === 'mp4') {
-      bytesPerSec = 328500; // Roughly 2.6Mbps
+      // Audio: 192 kbps (24,000 bytes/sec)
+      // Video: VBR optimized for mostly static/looping backgrounds averages ~380 kbps (47,500 bytes/sec)
+      // Total average: ~71,500 bytes/sec
+      bytesPerSec = 71500; 
     }
     return formatBytes(totalDuration * bytesPerSec);
   };
