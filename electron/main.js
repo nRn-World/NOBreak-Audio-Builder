@@ -1,11 +1,13 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
-import pkg from 'electron-updater';
-const { autoUpdater } = pkg;
-import path from 'path';
-import { fileURLToPath } from 'url';
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// electron-updater uses ESM internally but can be required via .cjs entrypoint
+let autoUpdater;
+try {
+  autoUpdater = require('electron-updater').autoUpdater;
+} catch (e) {
+  console.warn('[AutoUpdater] Could not load electron-updater:', e.message);
+}
 
 let mainWindow = null;
 
@@ -33,21 +35,14 @@ if (!gotTheLock) {
     });
 
     // ─── Auto-Updater (only runs in packaged .exe) ───────────────────────────
-    if (app.isPackaged) {
+    if (app.isPackaged && autoUpdater) {
       autoUpdater.logger = console;
-
-      // Automatically download updates silently in background
       autoUpdater.autoDownload = true;
       autoUpdater.autoInstallOnAppQuit = true;
 
-      // Check for updates 5 seconds after app start, then every hour
-      setTimeout(() => {
-        autoUpdater.checkForUpdates();
-      }, 5000);
-
-      setInterval(() => {
-        autoUpdater.checkForUpdates();
-      }, 60 * 60 * 1000); // 1 hour
+      // Check 5 seconds after start, then every hour
+      setTimeout(() => { autoUpdater.checkForUpdates(); }, 5000);
+      setInterval(() => { autoUpdater.checkForUpdates(); }, 60 * 60 * 1000);
 
       autoUpdater.on('checking-for-update', () => {
         console.log('[AutoUpdater] Checking for update...');
@@ -59,7 +54,7 @@ if (!gotTheLock) {
       });
 
       autoUpdater.on('update-not-available', (info) => {
-        console.log('[AutoUpdater] Up to date. Current version:', info.version);
+        console.log('[AutoUpdater] Up to date. Version:', info.version);
       });
 
       autoUpdater.on('download-progress', (progress) => {
@@ -105,31 +100,24 @@ function createWindow() {
     mainWindow.show();
   });
 
-  if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+  if (!app.isPackaged) {
     mainWindow.loadURL('http://127.0.0.1:3000');
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 }
 
-// IPC: Quit and install the downloaded update
-ipcMain.on('quit-app', () => {
-  app.quit();
-});
+// IPC handlers
+ipcMain.on('quit-app', () => { app.quit(); });
 
 ipcMain.on('restart-and-install', () => {
-  autoUpdater.quitAndInstall();
+  if (autoUpdater) autoUpdater.quitAndInstall();
 });
 
-// IPC: Manual update check trigger from renderer
 ipcMain.on('check-for-updates', () => {
-  if (app.isPackaged) {
-    autoUpdater.checkForUpdates();
-  }
+  if (app.isPackaged && autoUpdater) autoUpdater.checkForUpdates();
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
