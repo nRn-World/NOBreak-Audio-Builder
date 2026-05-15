@@ -13,6 +13,7 @@
 @layer base {
   body {
     @apply bg-brand-bg text-[#E0E2E6];
+    overflow-x: hidden;
   }
 }
 
