@@ -1,6 +1,6 @@
 <div align="center">
   <img src="public/logo.png" alt="NoBreak Logo" width="120" />
-  <h1>🌊 NOBREAK — Professional Audio Builder</h1>
+  <h1>🌊 NOBreak Professional Audio Builder</h1>
   <p><strong>A high-performance, desktop-based audio mixer designed for creating seamless, gapless audio compilations.</strong></p>
   <p>
     <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blue.svg" />
