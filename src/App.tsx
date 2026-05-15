@@ -24,6 +24,8 @@ import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { TrackSettings, GlobalSettings, ExportFormat, VisualAsset } from './types';
 import { decodeAudioFile, renderMix, encodeWAV, encodeMP3, calculateNormalization, renderVideo } from './utils/audio';
 
+declare const __APP_VERSION__: string;
+
 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
 
 // Waveform Component
@@ -760,7 +762,10 @@ export default function App() {
                   <h1 className="text-xl font-black tracking-tighter leading-none bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
                     NOBREAK
                   </h1>
-                  <span className="text-[9px] font-black uppercase tracking-[.25em] text-[#a855f7]">Audio Builder</span>
+                   <div className="flex items-center gap-2">
+                     <span className="text-[9px] font-black uppercase tracking-[.25em] text-[#a855f7]">Audio Builder</span>
+                     <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-white/30 border border-white/5 leading-none">v{__APP_VERSION__}</span>
+                   </div>
                 </div>
              </div>
           </div>
