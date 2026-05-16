@@ -377,7 +377,7 @@ export async function renderVideo(
 
     if (asset.type === 'image') {
       const img = assetElement as HTMLImageElement;
-      const scale = Math.max(width / img.width, height / img.height);
+      const scale = Math.min(width / img.width, height / img.height);
       const x = (width - img.width * scale) / 2;
       const y = (height - img.height * scale) / 2;
       ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
@@ -392,7 +392,7 @@ export async function renderVideo(
         vid.addEventListener('seeked', onSeeked);
       });
       
-      const scale = Math.max(width / vid.videoWidth, height / vid.videoHeight);
+      const scale = Math.min(width / vid.videoWidth, height / vid.videoHeight);
       const x = (width - vid.videoWidth * scale) / 2;
       const y = (height - vid.videoHeight * scale) / 2;
       ctx.drawImage(vid, x, y, vid.videoWidth * scale, vid.videoHeight * scale);
