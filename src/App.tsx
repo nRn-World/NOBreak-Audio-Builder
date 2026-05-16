@@ -402,9 +402,9 @@ export default function App() {
       bytesPerSec = 44100 * (depth / 8) * 2; 
     } else if (globalSettings.format === 'mp4') {
       // Audio: 192 kbps (24,000 bytes/sec)
-      // Video: VBR optimized for mostly static/looping backgrounds averages ~380 kbps (47,500 bytes/sec)
-      // Total average: ~71,500 bytes/sec
-      bytesPerSec = 71500; 
+      // Video: VBR optimized for mostly static/looping backgrounds averages ~216 kbps (27,000 bytes/sec)
+      // Total average: ~51,000 bytes/sec
+      bytesPerSec = 51000; 
     }
     return formatBytes(totalDuration * bytesPerSec);
   };
