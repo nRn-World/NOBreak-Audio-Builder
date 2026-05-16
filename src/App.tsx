@@ -1244,7 +1244,6 @@ export default function App() {
                   <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                   <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">Engine Ready</span>
                 </div>
-                <div className="text-[10px] font-mono text-white/20">v1.2.0</div>
               </div>
             </div>
             
