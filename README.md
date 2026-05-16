@@ -3,7 +3,7 @@
   <h1>🌊 NOBreak Professional Audio Builder</h1>
   <p><strong>A high-performance, desktop-based audio mixer designed for creating seamless, gapless audio compilations.</strong></p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blue.svg" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.0.7-blue.svg" />
     <img alt="License: Proprietary" src="https://img.shields.io/badge/License-Proprietary-yellow.svg" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-lightgrey.svg" />
   </p>
