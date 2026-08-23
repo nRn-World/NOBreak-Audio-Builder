@@ -73,3 +73,9 @@ See the [LICENSE.txt](./LICENSE.txt) file for the full legal terms.
   <br/>
   <sub>Built by nRn World</sub>
 </div>
+
+---
+
+☕ **Support development**: [Buy me a coffee 💜](https://ko-fi.com/nrnworld)
+
+Created by ❤️ © nRn World
