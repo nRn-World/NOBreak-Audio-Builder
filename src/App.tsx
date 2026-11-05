@@ -59,6 +59,7 @@ import {
   estimateTempo,
   getProjectTimeline,
   getTrackPlaybackDuration,
+  getTrackPlaybackRegion,
   inspectProjectQuality,
   suggestProjectTransitions,
 } from './utils/audio';
@@ -450,6 +451,7 @@ export default function App() {
   const [updateState, setUpdateState] = useState<'idle' | 'available' | 'downloading' | 'ready'>('idle');
 
   const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const previewMixSignatureRef = useRef<string>('');
   const startTimeRef = useRef<number>(0);
   const pauseTimeRef = useRef<number>(0);
   const progressIntervalRef = useRef<number | null>(null);
@@ -830,16 +832,37 @@ export default function App() {
     }
   };
 
+  const getMixSignature = () => JSON.stringify({
+    crossfade: globalSettings.crossfadeDuration,
+    normalize: globalSettings.normalize,
+    duck: globalSettings.autoDuck,
+    duckAmount: globalSettings.duckAmount,
+    tracks: tracks.map(track => ({
+      id: track.id,
+      duration: track.buffer?.duration || 0,
+      volume: track.volume,
+      fadeIn: track.fadeIn,
+      fadeOut: track.fadeOut,
+      startTrim: track.startTrim,
+      endTrim: track.endTrim,
+      bass: track.bass,
+      treble: track.treble,
+      tempoRatio: track.tempoRatio,
+      transitionDuration: track.transitionDuration,
+      role: track.role,
+      placement: track.placement,
+      overlayStart: track.overlayStart,
+    })),
+  });
+
   const previewMix = async () => {
-    if (playingId === 'full-mix') {
+    const mixSignature = getMixSignature();
+    const hasCurrentPreview = previewBuffer && previewMixSignatureRef.current === mixSignature;
+    if (playingId === 'full-mix' && hasCurrentPreview) {
       if (isPlaying) {
         pausePlayback();
-      } else {
-        if (previewBuffer) {
-           startPreviewAt(previewBuffer, currentTime);
-        } else {
-           // Shouldn't happen if paused
-        }
+      } else if (previewBuffer) {
+        startPreviewAt(previewBuffer, currentTime);
       }
       return;
     }
@@ -849,6 +872,7 @@ export default function App() {
     
     try {
       const buffer = await renderMix(tracks, globalSettings);
+      previewMixSignatureRef.current = mixSignature;
       setPreviewBuffer(buffer);
       startPreviewAt(buffer, 0);
     } catch (err) {
@@ -1448,6 +1472,15 @@ export default function App() {
                             ) : null
                             }
                             {track.placement === 'overlay' && <span className="text-[8px] px-2 py-0.5 rounded bg-cyan-400/10 text-cyan-200 font-black uppercase tracking-wider">Ovanpå mixen</span>}
+                            {track.buffer && (() => {
+                              const playable = getTrackPlaybackRegion(track);
+                              const removed = playable.autoLeadingSilence + playable.autoTrailingSilence;
+                              return removed > 0 ? (
+                                <span className="text-[8px] px-2 py-0.5 rounded bg-green-400/10 text-green-200 border border-green-400/20 font-black uppercase tracking-wider">
+                                  Tystnad bort {removed.toFixed(1)}s
+                                </span>
+                              ) : null;
+                            })()}
                           </div>
                         </div>
 
@@ -1778,10 +1811,10 @@ export default function App() {
                 )}
               </div>
 
-              {/* Crossfade */}
+              {/* NOBREAK overlap */}
               <div className="space-y-4">
                 <div className="flex justify-between items-end">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/40">Crossfade Length</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/40">NOBREAK-ÖVERLAPPNING</label>
                   <span className="font-mono text-sm text-[#ec4899]">{globalSettings.crossfadeDuration}s</span>
                 </div>
                 <div className="flex items-center gap-4">
@@ -1798,7 +1831,11 @@ export default function App() {
                   onChange={(e) => setGlobalSettings(s => ({ ...s, crossfadeDuration: parseFloat(e.target.value) }))}
                   className="w-full mt-[-16px] h-4 opacity-0 cursor-pointer absolute z-10"
                 />
-                <p className="text-[9px] font-bold italic text-white/20 uppercase">Smooth transition between all sources</p>
+                <p className="text-[9px] font-bold italic text-white/20 uppercase">Jämn överlappning mellan alla musikspår</p>
+                <div className="flex items-start gap-2 rounded-lg border border-green-400/10 bg-green-400/[0.035] px-3 py-2">
+                  <BadgeCheck size={13} className="mt-0.5 shrink-0 text-green-300" />
+                  <p className="text-[8px] leading-4 text-green-100/75"><strong className="font-black uppercase tracking-wider">NoBreak Guard aktiv.</strong> Tydlig tystnad i början och slutet av låtar tas bort automatiskt. Musikspår behåller alltid en kort säker överlappning.</p>
+                </div>
               </div>
 
               {/* Smart tempo and transition assistant */}
