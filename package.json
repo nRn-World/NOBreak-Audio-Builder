@@ -1,7 +1,7 @@
 {
   "name": "nobreak-audio-builder",
   "private": true,
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Professional audio mixing and merging tool for Windows",
   "repository": "https://github.com/nRn-World/NOBreak-Audio-Builder",
   "license": "SEE LICENSE IN LICENSE.txt",

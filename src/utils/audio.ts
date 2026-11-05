@@ -18,7 +18,8 @@ const dbToGain = (db: number) => Math.pow(10, -Math.abs(db) / 20);
 // NOBREAK keeps a small overlap even if a project is set to a zero-second
 // crossfade. That removes digital gaps while still feeling like a direct cut.
 const MIN_GAPLESS_OVERLAP = 0.35;
-const MIN_HARD_SILENCE_SECONDS = 0.18;
+const MIN_EDGE_QUIET_SECONDS = 0.12;
+const EDGE_ACTIVITY_SUPPORT_SECONDS = 0.35;
 
 export interface TrackPlaybackRegion {
   /** Start and end in the original source file after manual and safe automatic trimming. */
@@ -43,9 +44,10 @@ export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
 }
 
 /**
- * Finds only near-digital silence at a file's edges. The deliberately low
- * threshold keeps musical intros and natural fade-outs intact, while removing
- * the empty padding that otherwise creates a gap between two songs.
+ * Finds perceptibly quiet padding at a file's edges. A file can contain a
+ * little codec noise, a click, or a very low fade while still sounding silent
+ * to the listener. Looking for sustained musical energy, rather than one loud
+ * sample, means that padding cannot create a dead gap in a NOBREAK handoff.
  */
 function getHardEdgeSilence(buffer: AudioBuffer): EdgeSilence {
   const cached = edgeSilenceCache.get(buffer);
@@ -59,34 +61,61 @@ function getHardEdgeSilence(buffer: AudioBuffer): EdgeSilence {
   }
 
   const loudest = Math.max(...windows.map(window => window.energy), 0);
-  // The floor tolerates the tiny amount of codec noise common in MP3 files,
-  // while the cap avoids treating a naturally quiet musical passage as empty.
-  const threshold = Math.max(0.00045, Math.min(0.004, loudest * 0.008));
-  const firstAudible = windows.findIndex(window => window.energy > threshold);
-  const lastAudible = (() => {
-    for (let index = windows.length - 1; index >= 0; index--) {
-      if (windows[index].energy > threshold) return index;
+  if (loudest <= 0) {
+    // A fully silent file is left as-is so the quality checker can report it.
+    const empty = { leading: 0, trailing: 0 };
+    edgeSilenceCache.set(buffer, empty);
+    return empty;
+  }
+
+  // This is deliberately above the old near-digital-noise threshold. It finds
+  // the "looks blank and sounds blank" tail or intro that is visible in a mix
+  // preview, while scaling down gracefully for genuinely quiet recordings.
+  const threshold = Math.min(
+    loudest * 0.7,
+    Math.max(0.006, Math.min(0.02, loudest * 0.06)),
+  );
+  const windowLength = windows.length > 1
+    ? windows[1].time - windows[0].time
+    : Math.min(0.025, buffer.duration);
+  const supportWindows = Math.max(2, Math.ceil(EDGE_ACTIVITY_SUPPORT_SECONDS / Math.max(windowLength, 0.001)));
+  const requiredActiveWindows = Math.min(2, windows.length);
+  const isAudible = (index: number) => windows[index].energy > threshold;
+
+  const findSustainedAudible = (fromStart: boolean): number => {
+    const first = fromStart ? 0 : windows.length - 1;
+    const last = fromStart ? windows.length : -1;
+    const step = fromStart ? 1 : -1;
+
+    for (let index = first; index !== last; index += step) {
+      if (!isAudible(index)) continue;
+      let activeWindows = 0;
+      const supportEnd = fromStart
+        ? Math.min(windows.length, index + supportWindows)
+        : Math.max(-1, index - supportWindows);
+      for (let candidate = index; candidate !== supportEnd; candidate += step) {
+        if (isAudible(candidate)) activeWindows++;
+      }
+      if (activeWindows >= requiredActiveWindows) return index;
     }
     return -1;
-  })();
+  };
 
-  // A fully silent file is left as-is so the quality checker can report it.
+  const firstAudible = findSustainedAudible(true);
+  const lastAudible = findSustainedAudible(false);
   if (firstAudible === -1 || lastAudible === -1) {
     const empty = { leading: 0, trailing: 0 };
     edgeSilenceCache.set(buffer, empty);
     return empty;
   }
 
-  const windowLength = windows.length > 1
-    ? windows[1].time - windows[0].time
-    : Math.min(0.025, buffer.duration);
   const rawLeading = firstAudible > 0 ? windows[firstAudible].time : 0;
   const rawTrailing = lastAudible < windows.length - 1
     ? Math.max(0, buffer.duration - (windows[lastAudible].time + windowLength))
     : 0;
   const edge = {
-    leading: rawLeading >= MIN_HARD_SILENCE_SECONDS ? rawLeading : 0,
-    trailing: rawTrailing >= MIN_HARD_SILENCE_SECONDS ? rawTrailing : 0,
+    leading: rawLeading >= MIN_EDGE_QUIET_SECONDS ? rawLeading : 0,
+    trailing: rawTrailing >= MIN_EDGE_QUIET_SECONDS ? rawTrailing : 0,
   };
   edgeSilenceCache.set(buffer, edge);
   return edge;
@@ -94,7 +123,8 @@ function getHardEdgeSilence(buffer: AudioBuffer): EdgeSilence {
 
 /**
  * The playable part of a source. Manual trims always win; automatic trimming
- * only removes clear empty padding at the beginning and end of a file.
+ * removes sustained quiet padding at the beginning and end of a file so a
+ * transition never lands in dead air.
  */
 export function getTrackPlaybackRegion(track: TrackSettings): TrackPlaybackRegion {
   if (!track.buffer) {
