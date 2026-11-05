@@ -3,7 +3,7 @@
   <h1>🌊 NOBreak Professional Audio Builder</h1>
   <p><strong>A high-performance, desktop-based audio mixer designed for creating seamless, gapless audio compilations.</strong></p>
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.0.7-blue.svg" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.0.8-blue.svg" />
     <img alt="License: Proprietary" src="https://img.shields.io/badge/License-Proprietary-yellow.svg" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-lightgrey.svg" />
   </p>
@@ -41,6 +41,19 @@ NOBREAK is designed for creators who demand perfection. Whether you are building
 - **Visual Personalization:** Upload custom backgrounds or animated GIFs to create a branded, personal workspace while you edit.
 - **Unique Identity:** Every track is automatically assigned a unique color hue for extremely easy visual navigation on the timeline.
 - **Desktop Ready:** Built natively for Windows with Electron, providing a fast, standalone application experience with seamless auto-update capabilities.
+
+### Smart Mix Workspace
+
+- **Automatic tempo matching:** Finds an approximate BPM for music tracks and can gently align playback speed to a target tempo.
+- **Transition assistant:** Reviews adjacent tracks, suggests quieter exit points, removes clear lead-in silence, and recommends a crossfade length.
+- **Readable waveform grid:** Waveforms now show beat guides and clearly shade trimmed audio.
+- **Pre-export quality check:** Highlights unready files, long silence, potentially high levels, tempo jumps, overly long fades, and voiceovers without music ducking.
+- **Built-in voice recorder:** Record a narration directly in the project and place it over the mix.
+- **Automatic music ducking:** Lowers music only while an overlaid voice is active, then restores it smoothly.
+- **Starter templates:** DJ set, podcast, calm soundscape, and store/event presets provide sensible initial settings.
+- **Chapter list:** Edit chapter titles, see their final times, and download a ready-to-share text track list.
+- **Export profiles:** Choose Share, Podcast, or Master quality; set an export name and MP3 quality where relevant.
+- **Version history:** Save up to twelve project versions during the current session and restore any one of them before or after a larger edit.
 
 ---
 
