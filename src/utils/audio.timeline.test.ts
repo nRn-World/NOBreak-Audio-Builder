@@ -80,6 +80,24 @@ test('removes only clear edge padding from a song', () => {
   assert.ok(region.autoTrailingSilence >= 1.95);
 });
 
+test('removes quiet dead air and ignores isolated edge clicks', () => {
+  const buffer = makeBuffer({ duration: 12 });
+  const samples = buffer.getChannelData(0);
+  samples.fill(0.004);
+  samples.fill(0.35, 2_000, 10_000);
+  // A stray click or codec artifact must not make several seconds of silence
+  // look like music at either edge of the file.
+  samples[100] = 0.35;
+  samples[11_800] = 0.35;
+
+  const region = getTrackPlaybackRegion(makeTrack('quiet-edges', buffer));
+
+  assert.ok(Math.abs(region.sourceStart - 2) < 0.08);
+  assert.ok(Math.abs(region.sourceEnd - 10) < 0.08);
+  assert.ok(region.autoLeadingSilence > 1.9);
+  assert.ok(region.autoTrailingSilence > 1.9);
+});
+
 test('keeps a protection overlap between music tracks even at zero seconds', () => {
   const first = makeTrack('first', makeBuffer({ duration: 10, trailingSilence: 1 }));
   const second = makeTrack('second', makeBuffer({ duration: 10, leadingSilence: 1 }));

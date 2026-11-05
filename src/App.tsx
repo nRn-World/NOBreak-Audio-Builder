@@ -1834,7 +1834,7 @@ export default function App() {
                 <p className="text-[9px] font-bold italic text-white/20 uppercase">Jämn överlappning mellan alla musikspår</p>
                 <div className="flex items-start gap-2 rounded-lg border border-green-400/10 bg-green-400/[0.035] px-3 py-2">
                   <BadgeCheck size={13} className="mt-0.5 shrink-0 text-green-300" />
-                  <p className="text-[8px] leading-4 text-green-100/75"><strong className="font-black uppercase tracking-wider">NoBreak Guard aktiv.</strong> Tydlig tystnad i början och slutet av låtar tas bort automatiskt. Musikspår behåller alltid en kort säker överlappning.</p>
+                  <p className="text-[8px] leading-4 text-green-100/75"><strong className="font-black uppercase tracking-wider">NoBreak Guard aktiv.</strong> Tysta introer och slutpartier tas bort automatiskt, även när låg ljudnivå eller enstaka klick annars skulle skapa en lucka. Musikspår behåller alltid en säker överlappning.</p>
                 </div>
               </div>
 
