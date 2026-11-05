@@ -18,11 +18,50 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   Film as MovieIcon,
-  VideoOff
+  VideoOff,
+  Mic,
+  Square,
+  Sparkles,
+  Gauge,
+  BadgeCheck,
+  ListMusic,
+  History,
+  RotateCcw,
+  Save,
+  SlidersHorizontal,
+  Timer,
+  FileText,
+  Volume1,
+  Headphones,
+  MessageSquare,
+  Wand2,
+  AlertTriangle,
+  CheckCircle2,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
-import { TrackSettings, GlobalSettings, ExportFormat, VisualAsset } from './types';
-import { decodeAudioFile, renderMix, encodeWAV, encodeMP3, calculateNormalization, renderVideo } from './utils/audio';
+import {
+  TrackSettings,
+  GlobalSettings,
+  ExportFormat,
+  QualityIssue,
+  TransitionSuggestion,
+  ProjectSnapshot,
+} from './types';
+import {
+  decodeAudioFile,
+  renderMix,
+  encodeWAV,
+  encodeMP3,
+  calculateNormalization,
+  renderVideo,
+  createBeatMarkers,
+  estimateTempo,
+  getProjectTimeline,
+  getTrackPlaybackDuration,
+  inspectProjectQuality,
+  suggestProjectTransitions,
+} from './utils/audio';
 
 declare const __APP_VERSION__: string;
 
@@ -36,7 +75,11 @@ const WaveformCanvas = ({
   duration, 
   onSeek,
   loopRegion,
-  onLoopRegionChange
+  onLoopRegionChange,
+  startTrim = 0,
+  endTrim = 0,
+  beatMarkers = [],
+  isVoice = false,
 }: { 
   buffer: AudioBuffer, 
   color: string,
@@ -44,7 +87,11 @@ const WaveformCanvas = ({
   duration?: number,
   onSeek?: (time: number) => void,
   loopRegion?: { start: number, end: number },
-  onLoopRegionChange?: (region: { start: number, end: number } | undefined) => void
+  onLoopRegionChange?: (region: { start: number, end: number } | undefined) => void,
+  startTrim?: number,
+  endTrim?: number,
+  beatMarkers?: number[],
+  isVoice?: boolean,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dragRatio, setDragRatio] = useState<number | null>(null);
@@ -98,6 +145,47 @@ const WaveformCanvas = ({
     }
     ctx.stroke();
 
+    // A light beat grid makes it easier to line music up by eye. Voice tracks
+    // intentionally stay uncluttered because their phrasing matters more than beats.
+    if (!isVoice && beatMarkers.length && buffer.duration > 0) {
+      const markerStep = Math.max(1, Math.ceil(beatMarkers.length / 150));
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+      ctx.lineWidth = 1;
+      for (let index = 0; index < beatMarkers.length; index += markerStep) {
+        const x = (beatMarkers[index] / buffer.duration) * fw;
+        ctx.beginPath();
+        ctx.moveTo(x, 2);
+        ctx.lineTo(x, fh - 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Shade material that has been trimmed so the audible part of a file is
+    // immediately obvious without opening any extra controls.
+    if (buffer.duration > 0 && (startTrim > 0 || endTrim > 0)) {
+      const startX = (Math.min(startTrim, buffer.duration) / buffer.duration) * fw;
+      const endX = fw - (Math.min(endTrim, buffer.duration) / buffer.duration) * fw;
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.16)';
+      if (startX > 0) ctx.fillRect(0, 0, startX, fh);
+      if (endX < fw) ctx.fillRect(endX, 0, fw - endX, fh);
+      ctx.strokeStyle = 'rgba(248, 113, 113, 0.75)';
+      ctx.lineWidth = 1;
+      if (startX > 0) {
+        ctx.beginPath();
+        ctx.moveTo(startX, 0);
+        ctx.lineTo(startX, fh);
+        ctx.stroke();
+      }
+      if (endX < fw) {
+        ctx.beginPath();
+        ctx.moveTo(endX, 0);
+        ctx.lineTo(endX, fh);
+        ctx.stroke();
+      }
+    }
+
     const displayTime = dragRatio !== null && duration ? dragRatio * duration : currentTime;
 
     // Draw the progress overlay if displayTime and duration are provided
@@ -144,7 +232,7 @@ const WaveformCanvas = ({
       ctx.fillRect(startX, 0, 1, fh);
       ctx.fillRect(endX, 0, 1, fh);
     }
-  }, [buffer, color, currentTime, duration, dragRatio, loopDragStartRatio, loopDragCurrentRatio, loopRegion]);
+  }, [buffer, color, currentTime, duration, dragRatio, loopDragStartRatio, loopDragCurrentRatio, loopRegion, startTrim, endTrim, beatMarkers, isVoice]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!onSeek || !duration) return;
@@ -219,6 +307,56 @@ const WaveformCanvas = ({
   );
 };
 
+const PROJECT_TEMPLATES = [
+  {
+    id: 'dj',
+    title: 'DJ-set',
+    description: 'Längre övergångar och jämn takt mellan låtar.',
+    settings: { crossfadeDuration: 4, tempoSync: true, autoDuck: false, normalize: true, exportPreset: 'share' as const },
+  },
+  {
+    id: 'podcast',
+    title: 'Podd',
+    description: 'Kort musik, tydlig berättarröst och lagom filstorlek.',
+    settings: { crossfadeDuration: 1, tempoSync: false, autoDuck: true, duckAmount: 13, normalize: true, exportPreset: 'podcast' as const },
+  },
+  {
+    id: 'calm',
+    title: 'Lugn ljudbild',
+    description: 'Mjuka, längre övergångar för avslappning eller miljöljud.',
+    settings: { crossfadeDuration: 6, tempoSync: false, autoDuck: false, normalize: true, exportPreset: 'master' as const },
+  },
+  {
+    id: 'store',
+    title: 'Butik & event',
+    description: 'Jämn nivå och stabila, diskreta övergångar hela dagen.',
+    settings: { crossfadeDuration: 3, tempoSync: true, autoDuck: false, normalize: true, exportPreset: 'share' as const },
+  },
+] as const;
+
+const EXPORT_PRESETS = {
+  share: {
+    label: 'Dela',
+    description: 'MP3 i bra kvalitet för mobil och sociala medier.',
+    format: 'mp3' as const,
+    mp3Bitrate: 192 as const,
+  },
+  podcast: {
+    label: 'Podd',
+    description: 'Mindre MP3-fil som passar tal och publicering.',
+    format: 'mp3' as const,
+    mp3Bitrate: 128 as const,
+  },
+  master: {
+    label: 'Master',
+    description: 'WAV med hög kvalitet för arkiv eller vidare produktion.',
+    format: 'wav' as const,
+    bitDepth: 24 as const,
+  },
+};
+
+const clampTempoRatio = (ratio: number) => Math.min(1.16, Math.max(0.86, ratio));
+
 export default function App() {
   const [tracks, setTracks] = useState<TrackSettings[]>([]);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>(() => {
@@ -229,6 +367,13 @@ export default function App() {
       normalize: true,
       visualAssets: [],
       accentColor: '#ec4899', // Professional Pink default
+      tempoSync: false,
+      tempoTarget: 120,
+      autoDuck: true,
+      duckAmount: 12,
+      exportPreset: 'share',
+      mp3Bitrate: 192,
+      exportName: 'NoBreak_Project'
     };
 
     if (saved) {
@@ -253,7 +398,15 @@ export default function App() {
         bass: t.bass,
         treble: t.treble,
         startTrim: t.startTrim,
-        endTrim: t.endTrim
+        endTrim: t.endTrim,
+        detectedBpm: t.detectedBpm,
+        tempoRatio: t.tempoRatio,
+        transitionDuration: t.transitionDuration,
+        role: t.role,
+        placement: t.placement,
+        overlayStart: t.overlayStart,
+        chapterTitle: t.chapterTitle,
+        includeInChapters: t.includeInChapters
       }))
     };
     localStorage.setItem('no-break-project', JSON.stringify(dataToSave));
@@ -274,6 +427,21 @@ export default function App() {
   const [previewBuffer, setPreviewBuffer] = useState<AudioBuffer | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
+  // Smart workflow state: tempo, suggested joins, pre-export checks and version history.
+  const [transitionSuggestions, setTransitionSuggestions] = useState<TransitionSuggestion[]>([]);
+  const [qualityIssues, setQualityIssues] = useState<QualityIssue[]>([]);
+  const [qualityCheckedAt, setQualityCheckedAt] = useState<number | null>(null);
+  const [showQualityModal, setShowQualityModal] = useState(false);
+  const [isAnalysingTransitions, setIsAnalysingTransitions] = useState(false);
+  const [snapshots, setSnapshots] = useState<ProjectSnapshot[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Voice recording state.
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordingName, setRecordingName] = useState('Berättarröst');
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+
   // ── Auto-Updater state ────────────────────────────────────────────────────
   const [updateAvailableVersion, setUpdateAvailableVersion] = useState<string | null>(null);
   const [updateDownloadProgress, setUpdateDownloadProgress] = useState<number>(0);
@@ -285,6 +453,10 @@ export default function App() {
   const startTimeRef = useRef<number>(0);
   const pauseTimeRef = useRef<number>(0);
   const progressIntervalRef = useRef<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (playingId) {
@@ -301,18 +473,20 @@ export default function App() {
           if (activeSourceRef.current) {
             const elapsed = audioCtx.currentTime - startTimeRef.current;
             const t = playingId === 'full-mix' ? null : tracks.find(x => x.id === playingId);
-            let currentElapsed = elapsed;
+            // The waveform is measured in the source file's seconds, so its
+            // playhead follows the selected tempo ratio for a single track.
+            let currentElapsed = t ? elapsed * (t.tempoRatio || 1) : elapsed;
             
             if (t?.loopRegion && t.loopRegion.end > t.loopRegion.start) {
-              if (elapsed >= t.loopRegion.start) {
+              if (currentElapsed >= t.loopRegion.start) {
                 const loopLength = t.loopRegion.end - t.loopRegion.start;
                 if (loopLength > 0) {
-                  currentElapsed = t.loopRegion.start + ((elapsed - t.loopRegion.start) % loopLength);
+                  currentElapsed = t.loopRegion.start + ((currentElapsed - t.loopRegion.start) % loopLength);
                 }
               }
               setCurrentTime(currentElapsed);
             } else {
-              if (elapsed >= duration) {
+              if (currentElapsed >= duration) {
                 stopPlayback();
               } else {
                 setCurrentTime(currentElapsed);
@@ -396,7 +570,7 @@ export default function App() {
   const getEstimatedSize = () => {
     let bytesPerSec = 0;
     if (globalSettings.format === 'mp3') {
-      bytesPerSec = 40000; // 320kbps
+      bytesPerSec = (globalSettings.mp3Bitrate || 192) * 125;
     } else if (globalSettings.format === 'wav') {
       const depth = globalSettings.bitDepth || 16;
       bytesPerSec = 44100 * (depth / 8) * 2; 
@@ -425,52 +599,65 @@ export default function App() {
     return [];
   }, []);
 
-  const handleFileUpload = useCallback(async (files: FileList | File[]) => {
-    const newTracks: TrackSettings[] = [];
-    const fileArray = Array.from(files);
-    
-    // Get the base index for color generation to ensure uniqueness relative to existing tracks
-    const baseIndex = tracks.length;
+  const addAudioFile = useCallback(async (
+    file: File,
+    overrides: Partial<TrackSettings> = {},
+    paletteIndex = tracks.length,
+  ) => {
+    const id = Math.random().toString(36).slice(2, 10);
+    const role = overrides.role || 'music';
+    const hue = role === 'voice' ? 190 : (paletteIndex * 137.508) % 360;
+    const fallbackName = file.name.replace(/\.[^/.]+$/, '') || 'Nytt ljudspår';
+    const track: TrackSettings = {
+      name: file.name,
+      volume: 1,
+      fadeIn: role === 'voice' ? 0.08 : 0.5,
+      fadeOut: role === 'voice' ? 0.15 : 0.5,
+      color: `hsl(${hue}, 75%, 65%)`,
+      role,
+      placement: role === 'voice' ? 'overlay' : 'sequence',
+      overlayStart: role === 'voice' ? 0 : undefined,
+      chapterTitle: fallbackName,
+      includeInChapters: role !== 'voice',
+      ...overrides,
+      id,
+      file,
+      buffer: null,
+    };
 
-    for (let i = 0; i < fileArray.length; i++) {
-      const file = fileArray[i];
-      // Audio files
-      if (file.type.startsWith('audio/') || file.name.endsWith('.mp3') || file.name.endsWith('.wav')) {
-        const id = Math.random().toString(36).substring(7);
-        
-        // Generate a unique color using Golden Angle distribution in HSL space
-        const hue = ((baseIndex + i) * 137.508) % 360;
-        const trackColor = `hsl(${hue}, 75%, 65%)`;
+    setTracks(previous => [...previous, track]);
 
-        const track: TrackSettings = {
-          id,
-          name: file.name,
-          file,
-          buffer: null,
-          volume: 1.0,
-          fadeIn: 0.5,
-          fadeOut: 0.5,
-          color: trackColor
-        };
-        newTracks.push(track);
-        
-        decodeAudioFile(file).then(buffer => {
-          setTracks(prev => prev.map(t => t.id === id ? { 
-            ...t, 
-            buffer,
-            volume: globalSettings.normalize ? calculateNormalization(buffer) : 1.0
-          } : t));
-        }).catch(err => {
-          console.error(`Failed to decode ${file.name}:`, err);
-        });
-      } 
-      // Visual files (if dropped on main area)
-      else if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
-         handleVisualUpload(file);
-      }
+    try {
+      const buffer = await decodeAudioFile(file);
+      const bpm = role === 'music' ? estimateTempo(buffer) : undefined;
+      const targetTempo = globalSettings.tempoTarget || bpm || 120;
+      const tempoRatio = globalSettings.tempoSync && bpm
+        ? clampTempoRatio(targetTempo / bpm)
+        : 1;
+      setTracks(previous => previous.map(item => item.id === id ? {
+        ...item,
+        buffer,
+        volume: globalSettings.normalize ? Math.min(2, calculateNormalization(buffer)) : item.volume,
+        detectedBpm: bpm,
+        tempoRatio,
+        beatMarkers: role === 'music' ? createBeatMarkers(buffer, bpm) : [],
+      } : item));
+    } catch (error) {
+      console.error(`Failed to decode ${file.name}:`, error);
     }
-    setTracks(prev => [...prev, ...newTracks]);
-  }, [globalSettings.normalize, tracks.length]);
+  }, [globalSettings.normalize, globalSettings.tempoSync, globalSettings.tempoTarget, tracks.length]);
+
+  const handleFileUpload = useCallback((files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const baseIndex = tracks.length;
+    fileArray.forEach((file, index) => {
+      if (file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|aac|webm)$/i.test(file.name)) {
+        void addAudioFile(file, {}, baseIndex + index);
+      } else if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+        handleVisualUpload(file);
+      }
+    });
+  }, [addAudioFile, tracks.length]);
 
   const handleVisualUpload = (file: File) => {
     const url = URL.createObjectURL(file);
@@ -556,6 +743,7 @@ export default function App() {
 
     const source = audioCtx.createBufferSource();
     source.buffer = track.buffer;
+    source.playbackRate.value = track.tempoRatio || 1;
     const gainNode = audioCtx.createGain();
     gainNode.gain.value = track.volume;
     
@@ -577,7 +765,7 @@ export default function App() {
     const offset = Math.max(0, Math.min(time, track.buffer.duration));
     source.start(0, offset);
     activeSourceRef.current = source;
-    startTimeRef.current = audioCtx.currentTime - offset;
+    startTimeRef.current = audioCtx.currentTime - (offset / (track.tempoRatio || 1));
     setCurrentTime(offset);
     setPlayingId(track.id);
     setIsPlaying(true);
@@ -689,8 +877,265 @@ export default function App() {
     setTracks(newTracks);
   };
 
-  const handleExport = async () => {
+  const captureSnapshot = (label: string) => {
+    if (!tracks.length) return;
+    const snapshot: ProjectSnapshot = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      label,
+      createdAt: Date.now(),
+      tracks: tracks.map(track => ({
+        ...track,
+        beatMarkers: track.beatMarkers ? [...track.beatMarkers] : [],
+        loopRegion: track.loopRegion ? { ...track.loopRegion } : undefined,
+      })),
+      globalSettings: {
+        ...globalSettings,
+        visualAssets: [...globalSettings.visualAssets],
+      },
+    };
+    setSnapshots(previous => [snapshot, ...previous].slice(0, 12));
+  };
+
+  const restoreSnapshot = (snapshotId: string) => {
+    const snapshot = snapshots.find(item => item.id === snapshotId);
+    if (!snapshot) return;
+    const currentSnapshot: ProjectSnapshot = {
+      id: `${Date.now()}-before-restore`,
+      label: 'Före återställning',
+      createdAt: Date.now(),
+      tracks: tracks.map(track => ({ ...track, beatMarkers: track.beatMarkers ? [...track.beatMarkers] : [] })),
+      globalSettings: { ...globalSettings, visualAssets: [...globalSettings.visualAssets] },
+    };
+    stopPlayback();
+    setTracks(snapshot.tracks.map(track => ({
+      ...track,
+      beatMarkers: track.beatMarkers ? [...track.beatMarkers] : [],
+      loopRegion: track.loopRegion ? { ...track.loopRegion } : undefined,
+    })));
+    setGlobalSettings({
+      ...snapshot.globalSettings,
+      // Object URLs may have been released after a visual was removed. Rebuild
+      // them from the original File so a restored version is fully usable.
+      visualAssets: snapshot.globalSettings.visualAssets.map(asset => ({
+        ...asset,
+        url: URL.createObjectURL(asset.file),
+      })),
+    });
+    setSnapshots(previous => [currentSnapshot, ...previous.filter(item => item.id !== snapshotId)].slice(0, 12));
+    setTransitionSuggestions([]);
+    setQualityIssues([]);
+    setShowHistory(false);
+  };
+
+  const applyTempoTarget = (target: number, saveVersion = false) => {
+    const safeTarget = Math.round(Math.min(200, Math.max(70, target || 120)));
+    if (saveVersion) captureSnapshot('Före tempomatchning');
+    setGlobalSettings(settings => ({ ...settings, tempoSync: true, tempoTarget: safeTarget }));
+    setTracks(previous => previous.map(track => ({
+      ...track,
+      tempoRatio: track.detectedBpm ? clampTempoRatio(safeTarget / track.detectedBpm) : 1,
+    })));
+  };
+
+  const toggleTempoSync = () => {
+    if (globalSettings.tempoSync) {
+      captureSnapshot('Före avstängd tempomatchning');
+      setGlobalSettings(settings => ({ ...settings, tempoSync: false }));
+      setTracks(previous => previous.map(track => ({ ...track, tempoRatio: 1 })));
+      return;
+    }
+    const suggestedTarget = globalSettings.tempoTarget
+      || tracks.find(track => track.detectedBpm)?.detectedBpm
+      || 120;
+    applyTempoTarget(suggestedTarget, true);
+  };
+
+  const analyseTransitions = async () => {
+    if (tracks.filter(track => track.placement !== 'overlay' && track.buffer).length < 2) return;
+    setIsAnalysingTransitions(true);
+    await new Promise(resolve => window.setTimeout(resolve, 20));
+    try {
+      setTransitionSuggestions(suggestProjectTransitions(tracks, globalSettings));
+    } finally {
+      setIsAnalysingTransitions(false);
+    }
+  };
+
+  const applyTransitionSuggestions = () => {
+    if (!transitionSuggestions.length) return;
+    captureSnapshot('Före smarta övergångar');
+    const fromSuggestions = new Map<string, TransitionSuggestion>(transitionSuggestions.map(suggestion => [suggestion.fromId, suggestion]));
+    const toSuggestions = new Map<string, TransitionSuggestion>(transitionSuggestions.map(suggestion => [suggestion.toId, suggestion]));
+    setTracks(previous => previous.map(track => {
+      const from = fromSuggestions.get(track.id);
+      const to = toSuggestions.get(track.id);
+      return {
+        ...track,
+        endTrim: from ? from.suggestedEndTrim : track.endTrim,
+        transitionDuration: from ? from.suggestedCrossfade : track.transitionDuration,
+        startTrim: to ? to.suggestedStartTrim : track.startTrim,
+      };
+    }));
+  };
+
+  const runQualityCheck = () => {
+    const report = inspectProjectQuality(tracks, globalSettings);
+    setQualityIssues(report);
+    setQualityCheckedAt(Date.now());
+    return report;
+  };
+
+  const applyExportPreset = (presetKey: keyof typeof EXPORT_PRESETS) => {
+    const preset = EXPORT_PRESETS[presetKey];
+    setGlobalSettings(settings => ({
+      ...settings,
+      exportPreset: presetKey,
+      format: preset.format,
+      mp3Bitrate: 'mp3Bitrate' in preset ? preset.mp3Bitrate : settings.mp3Bitrate,
+      bitDepth: 'bitDepth' in preset ? preset.bitDepth : settings.bitDepth,
+    }));
+  };
+
+  const applyTemplate = (templateId: typeof PROJECT_TEMPLATES[number]['id']) => {
+    const template = PROJECT_TEMPLATES.find(item => item.id === templateId);
+    if (!template) return;
+    captureSnapshot(`Före mallen ${template.title}`);
+    const exportPreset = EXPORT_PRESETS[template.settings.exportPreset];
+    const targetTempo = globalSettings.tempoTarget || tracks.find(track => track.detectedBpm)?.detectedBpm || 120;
+    setGlobalSettings(settings => ({
+      ...settings,
+      ...template.settings,
+      tempoTarget: targetTempo,
+      format: exportPreset.format,
+      mp3Bitrate: 'mp3Bitrate' in exportPreset ? exportPreset.mp3Bitrate : settings.mp3Bitrate,
+      bitDepth: 'bitDepth' in exportPreset ? exportPreset.bitDepth : settings.bitDepth,
+    }));
+    setTracks(previous => previous.map(track => ({
+      ...track,
+      tempoRatio: template.settings.tempoSync && track.detectedBpm
+        ? clampTempoRatio(targetTempo / track.detectedBpm)
+        : 1,
+    })));
+  };
+
+  const downloadChapters = () => {
+    const timeline = getProjectTimeline(tracks, globalSettings);
+    const chapters = timeline.entries
+      .filter(entry => entry.kind === 'sequence' && entry.track.includeInChapters !== false)
+      .sort((a, b) => a.start - b.start);
+    if (!chapters.length) return;
+    const formatChapterTime = (seconds: number) => {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      return hours > 0
+        ? `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+        : `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+    const title = globalSettings.exportName?.trim() || 'NoBreak Project';
+    const contents = `${title}\n${'='.repeat(title.length)}\n\n${chapters
+      .map(entry => `${formatChapterTime(entry.start)}  ${entry.track.chapterTitle?.trim() || entry.track.name}`)
+      .join('\n')}\n`;
+    const blob = new Blob([contents], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${title.replace(/[^a-z0-9-_]+/gi, '_') || 'NoBreak_Project'}_kapitel.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const startVoiceRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setRecordingError('Din webbläsare har inte stöd för inspelning från mikrofonen.');
+      return;
+    }
+    try {
+      setRecordingError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      const preferredType = ['audio/webm;codecs=opus', 'audio/webm']
+        .find(type => MediaRecorder.isTypeSupported(type));
+      const recorder = preferredType
+        ? new MediaRecorder(stream, { mimeType: preferredType })
+        : new MediaRecorder(stream);
+      recordedChunksRef.current = [];
+      mediaRecorderRef.current = recorder;
+      recordingStreamRef.current = stream;
+      recorder.ondataavailable = event => {
+        if (event.data.size > 0) recordedChunksRef.current.push(event.data);
+      };
+      recorder.onstop = async () => {
+        const mimeType = recorder.mimeType || 'audio/webm';
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+        stream.getTracks().forEach(track => track.stop());
+        recordingStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        if (!blob.size) {
+          setRecordingError('Inspelningen blev tom. Kontrollera mikrofonen och försök igen.');
+          return;
+        }
+        const cleanName = recordingName.trim() || 'Berättarröst';
+        const file = new File([blob], `${cleanName}.webm`, { type: mimeType });
+        const mixLength = getProjectTimeline(tracks, globalSettings).totalDuration;
+        const overlayStart = Math.min(Math.max(currentTime || 0, 0), mixLength || 0);
+        captureSnapshot('Före röstinspelning');
+        await addAudioFile(file, {
+          name: cleanName,
+          role: 'voice',
+          placement: 'overlay',
+          overlayStart,
+          includeInChapters: false,
+          chapterTitle: cleanName,
+        }, tracks.length);
+      };
+      recorder.start(250);
+      setRecordingSeconds(0);
+      setIsRecording(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Mikrofonen kunde inte startas.';
+      setRecordingError(`Kunde inte starta mikrofonen: ${message}`);
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+    setIsRecording(false);
+  };
+
+  useEffect(() => {
+    if (!isRecording) {
+      if (recordingTimerRef.current) {
+        window.clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      return;
+    }
+    recordingTimerRef.current = window.setInterval(() => setRecordingSeconds(seconds => seconds + 1), 1000);
+    return () => {
+      if (recordingTimerRef.current) {
+        window.clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+    };
+  }, [isRecording]);
+
+  useEffect(() => () => {
+    if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
+    recordingStreamRef.current?.getTracks().forEach(track => track.stop());
+  }, []);
+
+  const handleExport = async (force = false) => {
     if (tracks.length === 0) return;
+    if (!force) {
+      runQualityCheck();
+      setShowQualityModal(true);
+      return;
+    }
     setIsRendering(true);
     setIsRenderingMinimized(false);
     setRenderProgress(0);
@@ -700,7 +1145,8 @@ export default function App() {
       const resultBuffer = await renderMix(tracks, globalSettings);
       
       let blob: Blob;
-      if (globalSettings.format === 'mp4' && globalSettings.visualAssets.length > 0) {
+      const isVideoExport = globalSettings.format === 'mp4' && globalSettings.visualAssets.length > 0;
+      if (isVideoExport) {
         console.log('Starting video render...');
         blob = await renderVideo(resultBuffer, globalSettings.visualAssets, (p) => setRenderProgress(p));
       } else {
@@ -708,7 +1154,7 @@ export default function App() {
         if (globalSettings.format === 'wav') {
           blob = encodeWAV(resultBuffer, globalSettings.bitDepth || 16);
         } else {
-          blob = await encodeMP3(resultBuffer, (p) => setRenderProgress(p));
+          blob = await encodeMP3(resultBuffer, globalSettings.mp3Bitrate || 192, (p) => setRenderProgress(p));
         }
       }
       
@@ -717,7 +1163,12 @@ export default function App() {
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `NoBreak_Project_${new Date().getTime()}.${globalSettings.format === 'mp4' ? 'mp4' : globalSettings.format}`;
+      const safeProjectName = (globalSettings.exportName || 'NoBreak_Project')
+        .trim()
+        .replace(/[^a-z0-9-_]+/gi, '_')
+        .replace(/^_+|_+$/g, '') || 'NoBreak_Project';
+      const extension = isVideoExport ? 'mp4' : globalSettings.format === 'wav' ? 'wav' : 'mp3';
+      a.download = `${safeProjectName}_${new Date().getTime()}.${extension}`;
       
       document.body.appendChild(a);
       a.click();
@@ -735,16 +1186,11 @@ export default function App() {
     }
   };
 
-  const totalDuration = (() => {
-    if (tracks.length === 0) return 0;
-    let dur = 0;
-    tracks.forEach((t, i) => {
-      const trackDur = t.buffer?.duration || 0;
-      if (i === 0) dur = trackDur;
-      else dur = (dur - globalSettings.crossfadeDuration) + trackDur;
-    });
-    return Math.max(dur, 0);
-  })();
+  const projectTimeline = getProjectTimeline(tracks, globalSettings);
+  const totalDuration = projectTimeline.totalDuration;
+  const chapterEntries = projectTimeline.entries
+    .filter(entry => entry.kind === 'sequence' && entry.track.includeInChapters !== false)
+    .sort((a, b) => a.start - b.start);
 
   return (
     <div className="min-h-screen bg-brand-bg text-[#E0E2E6] font-sans flex flex-col overflow-x-hidden">
@@ -779,6 +1225,22 @@ export default function App() {
              <span className="text-[10px] uppercase tracking-[0.2em] text-white/40">Total Mix Length</span>
              <span className="font-mono text-sm">{formatTime(totalDuration)}</span>
           </div>
+          <button
+            onClick={() => { runQualityCheck(); setShowQualityModal(true); }}
+            disabled={tracks.length === 0 || isRendering}
+            className="hidden xl:flex px-3 py-2 border border-white/10 rounded font-black text-[10px] uppercase tracking-widest text-white/70 hover:bg-white/10 disabled:opacity-30 transition-all items-center gap-2"
+            title="Kontrollera mixen före export"
+          >
+            <BadgeCheck size={14} className="text-[#a855f7]" />
+            Kontroll
+          </button>
+          <button
+            onClick={() => setShowHistory(true)}
+            className="hidden lg:flex p-2 border border-white/10 rounded text-white/60 hover:bg-white/10 hover:text-white transition-all"
+            title="Tidigare versioner"
+          >
+            <History size={16} />
+          </button>
           <button 
             onClick={previewMix}
             disabled={isRendering || tracks.length === 0}
@@ -821,7 +1283,7 @@ export default function App() {
             </div>
             <div className="bg-white/5 border border-white/10 p-3 rounded-lg flex flex-col items-center min-w-[100px]">
               <span className="text-[10px] text-[#a855f7] font-bold uppercase mb-1">Quality</span>
-              <span className="text-lg font-bold">{globalSettings.format === 'wav' ? `${globalSettings.bitDepth || 16}-BIT` : 'MAX'}</span>
+              <span className="text-lg font-bold">{globalSettings.format === 'wav' ? `${globalSettings.bitDepth || 16}-BIT` : globalSettings.format === 'mp3' ? `${globalSettings.mp3Bitrate || 192}K` : 'VIDEO'}</span>
             </div>
           </div>
         </div>
@@ -829,6 +1291,80 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Main Timeline Column */}
           <div className="lg:col-span-3 space-y-6">
+            {/* Ready-made starting points */}
+            <section className="rounded-2xl border border-white/5 bg-brand-panel/70 p-5">
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <Sparkles size={16} className="text-[#a855f7]" />
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-[0.18em]">Börja med en mall</h3>
+                    <p className="text-[10px] text-white/40 mt-1">Välj en färdig grund och justera sedan fritt.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => captureSnapshot('Manuell version')}
+                  disabled={!tracks.length}
+                  className="px-3 py-2 rounded border border-white/10 bg-white/5 text-[9px] font-black uppercase tracking-widest text-white/70 hover:bg-white/10 disabled:opacity-30 flex items-center gap-2"
+                >
+                  <Save size={13} /> Spara version
+                </button>
+              </div>
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
+                {PROJECT_TEMPLATES.map(template => (
+                  <button
+                    key={template.id}
+                    onClick={() => applyTemplate(template.id)}
+                    className="text-left rounded-xl border border-white/5 bg-white/[0.03] p-3 hover:border-[#a855f7]/50 hover:bg-[#a855f7]/10 transition-all"
+                  >
+                    <span className="block text-[10px] font-black uppercase tracking-wider text-white">{template.title}</span>
+                    <span className="block text-[9px] leading-relaxed text-white/40 mt-1">{template.description}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {/* Voiceover recorder */}
+            <section className="rounded-2xl border border-cyan-400/15 bg-gradient-to-r from-cyan-400/[0.06] to-transparent p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isRecording ? 'bg-red-500/20 text-red-300 animate-pulse' : 'bg-cyan-400/10 text-cyan-300'}`}>
+                    <Mic size={19} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-[0.18em]">Spela in berättarröst</h3>
+                    <p className="text-[10px] text-white/45 mt-1">Rösten placeras över musiken vid aktuell tid och kan automatiskt sänka bakgrundsmusiken.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={recordingName}
+                    onChange={event => setRecordingName(event.target.value)}
+                    disabled={isRecording}
+                    maxLength={50}
+                    aria-label="Namn på röstinspelning"
+                    className="w-36 sm:w-44 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white outline-none focus:border-cyan-300/60 disabled:opacity-50"
+                    placeholder="Berättarröst"
+                  />
+                  {isRecording ? (
+                    <button
+                      onClick={stopVoiceRecording}
+                      className="px-4 py-2 rounded-lg bg-red-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+                    >
+                      <Square size={12} fill="currentColor" /> Stoppa {formatTime(recordingSeconds).slice(0, 5)}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={startVoiceRecording}
+                      className="px-4 py-2 rounded-lg bg-cyan-300 text-[#051013] text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-cyan-200"
+                    >
+                      <Mic size={13} /> Spela in
+                    </button>
+                  )}
+                </div>
+              </div>
+              {recordingError && <p className="mt-3 text-[10px] font-semibold text-red-300">{recordingError}</p>}
+            </section>
+
             {/* Drop Zone */}
             <div 
               onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
@@ -901,8 +1437,17 @@ export default function App() {
                           <div className="flex items-center gap-2">
                             <h4 className="font-bold text-base tracking-tight truncate uppercase italic">{track.name}</h4>
                             <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded text-white/40 font-mono">
-                              {track.buffer ? `${(track.buffer.duration - (track.startTrim || 0) - (track.endTrim || 0)).toFixed(1)}s` : '...'}
+                              {track.buffer ? `${getTrackPlaybackDuration(track).toFixed(1)}s` : '...'}
                             </span>
+                            {track.role === 'voice' ? (
+                              <span className="text-[8px] px-2 py-0.5 rounded bg-cyan-400/10 text-cyan-200 border border-cyan-400/20 font-black uppercase tracking-wider">Röst</span>
+                            ) : track.detectedBpm ? (
+                              <span className="text-[8px] px-2 py-0.5 rounded bg-[#a855f7]/10 text-[#d8b4fe] border border-[#a855f7]/20 font-black uppercase tracking-wider">
+                                {track.detectedBpm} BPM{globalSettings.tempoSync && track.tempoRatio && Math.abs(track.tempoRatio - 1) > 0.005 ? ` · ${Math.round(track.tempoRatio * 100)}%` : ''}
+                              </span>
+                            ) : null
+                            }
+                            {track.placement === 'overlay' && <span className="text-[8px] px-2 py-0.5 rounded bg-cyan-400/10 text-cyan-200 font-black uppercase tracking-wider">Ovanpå mixen</span>}
                           </div>
                         </div>
 
@@ -1050,10 +1595,107 @@ export default function App() {
                            />
                         </div>
                       </div>
+
+                      {/* Smart per-track controls: voice placement, chapters and an optional custom join. */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 border-t border-white/5 pt-3">
+                        <div className="space-y-1">
+                          <span className="block text-[7px] font-black uppercase tracking-widest text-white/20">Spårtyp</span>
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              const becomesVoice = track.role !== 'voice';
+                              updateTrack(track.id, {
+                                role: becomesVoice ? 'voice' : 'music',
+                                placement: becomesVoice ? 'overlay' : 'sequence',
+                                includeInChapters: !becomesVoice,
+                                overlayStart: becomesVoice ? Math.min(currentTime || 0, totalDuration) : undefined,
+                              });
+                            }}
+                            className={`w-full rounded px-2 py-1.5 text-left text-[9px] font-black uppercase tracking-wider border transition-all ${track.role === 'voice' ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200' : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'}`}
+                          >
+                            {track.role === 'voice' ? 'Berättarröst' : 'Musik / ljud'}
+                          </button>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[7px] font-black uppercase tracking-widest text-white/20">
+                            <span>{track.role === 'voice' ? 'Placering' : 'Övergång till nästa'}</span>
+                            {track.role !== 'voice' && <span>{track.transitionDuration ?? globalSettings.crossfadeDuration}s</span>}
+                          </div>
+                          {track.role === 'voice' ? (
+                            <button
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                updateTrack(track.id, { placement: track.placement === 'overlay' ? 'sequence' : 'overlay' });
+                              }}
+                              className="w-full rounded px-2 py-1.5 text-left text-[9px] font-black uppercase tracking-wider border border-cyan-400/20 bg-cyan-400/[0.06] text-cyan-100 hover:bg-cyan-400/10"
+                            >
+                              {track.placement === 'overlay' ? 'Ovanpå musik' : 'Eget avsnitt'}
+                            </button>
+                          ) : (
+                            <input
+                              type="range"
+                              min="0"
+                              max="8"
+                              step="0.5"
+                              value={track.transitionDuration ?? globalSettings.crossfadeDuration}
+                              onChange={event => updateTrack(track.id, { transitionDuration: parseFloat(event.target.value) })}
+                              onPointerDown={event => event.stopPropagation()}
+                              className="w-full h-5 accent-[#a855f7]"
+                            />
+                          )}
+                        </div>
+
+                        {track.role === 'voice' && track.placement === 'overlay' ? (
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[7px] font-black uppercase tracking-widest text-white/20">
+                              <span>Start i mixen</span>
+                              <span>{formatTime(track.overlayStart || 0).slice(0, 5)}</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max={Math.max(totalDuration, 1)}
+                              step="0.1"
+                              value={Math.min(track.overlayStart || 0, Math.max(totalDuration, 1))}
+                              onChange={event => updateTrack(track.id, { overlayStart: parseFloat(event.target.value) })}
+                              onPointerDown={event => event.stopPropagation()}
+                              className="w-full h-5 accent-cyan-300"
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[7px] font-black uppercase tracking-widest text-white/20">
+                              <span>Tempo</span>
+                              <span>{track.detectedBpm ? `${track.detectedBpm} BPM` : '–'}</span>
+                            </div>
+                            <p className="text-[9px] leading-4 text-white/35">{globalSettings.tempoSync && track.detectedBpm ? `Matchas till ${globalSettings.tempoTarget || 120} BPM` : 'Taktlinjer visas i vågformen'}</p>
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-[7px] font-black uppercase tracking-widest text-white/20">
+                            <span>Kapitelrubrik</span>
+                            <button
+                              onClick={event => { event.stopPropagation(); updateTrack(track.id, { includeInChapters: !(track.includeInChapters !== false) }); }}
+                              className={`text-[7px] ${track.includeInChapters !== false ? 'text-green-300' : 'text-white/30'}`}
+                            >
+                              {track.includeInChapters !== false ? 'Med' : 'Utanför'}
+                            </button>
+                          </div>
+                          <input
+                            value={track.chapterTitle ?? track.name}
+                            onChange={event => updateTrack(track.id, { chapterTitle: event.target.value })}
+                            onPointerDown={event => event.stopPropagation()}
+                            className="w-full rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[9px] text-white outline-none focus:border-[#a855f7]/60"
+                            aria-label={`Kapitelrubrik för ${track.name}`}
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     {/* Waveform Row */}
-                    <div className="w-full bg-black/20 border-t border-white/5 pointer-events-auto h-12 relative flex flex-col">
+                    <div className="w-full bg-black/20 border-t border-white/5 pointer-events-auto h-14 relative flex flex-col">
                       {track.buffer ? (
                         <div className="w-full h-full relative" onPointerDown={(e) => e.stopPropagation()}>
                           <WaveformCanvas 
@@ -1064,10 +1706,19 @@ export default function App() {
                             onSeek={(t) => handleSeekTrack(track, t)}
                             loopRegion={track.loopRegion}
                             onLoopRegionChange={(region) => updateTrack(track.id, { loopRegion: region })}
+                            startTrim={track.startTrim}
+                            endTrim={track.endTrim}
+                            beatMarkers={track.beatMarkers}
+                            isVoice={track.role === 'voice'}
                           />
                         </div>
                       ) : (
                         <div className="w-full h-full bg-gradient-to-r from-[#ec4899]/10 to-transparent pointer-events-none" />
+                      )}
+                      {track.buffer && (
+                        <span className="pointer-events-none absolute bottom-1 left-3 rounded bg-black/40 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-widest text-white/35">
+                          {track.role === 'voice' ? 'Röstvågform' : 'Vågform · taktrutor'}{(track.startTrim || track.endTrim) ? ' · rött beskärs' : ''}
+                        </span>
                       )}
                     </div>
                   </Reorder.Item>
@@ -1150,6 +1801,121 @@ export default function App() {
                 <p className="text-[9px] font-bold italic text-white/20 uppercase">Smooth transition between all sources</p>
               </div>
 
+              {/* Smart tempo and transition assistant */}
+              <div className="space-y-5 border-t border-white/5 pt-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex gap-3">
+                    <Gauge size={15} className="mt-0.5 text-[#a855f7]" />
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest">Automatisk taktpassning</h4>
+                      <p className="text-[9px] leading-4 text-white/35 mt-1">Anpassar uppspelningstakten försiktigt för ett jämnare byte mellan låtar.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={toggleTempoSync}
+                    className={`w-9 h-5 rounded-full relative transition-all flex-shrink-0 ${globalSettings.tempoSync ? 'bg-[#a855f7]' : 'bg-white/10'}`}
+                    aria-label="Slå på eller av automatisk taktpassning"
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${globalSettings.tempoSync ? 'left-4' : 'left-0.5'}`} />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[9px] font-bold uppercase tracking-wider text-white/35 whitespace-nowrap">Måltempo</label>
+                  <input
+                    type="number"
+                    min="70"
+                    max="200"
+                    value={globalSettings.tempoTarget || 120}
+                    onChange={event => {
+                      const target = Math.max(70, Math.min(200, Number(event.target.value) || 120));
+                      setGlobalSettings(settings => ({ ...settings, tempoTarget: target }));
+                      if (globalSettings.tempoSync) {
+                        setTracks(previous => previous.map(track => ({ ...track, tempoRatio: track.detectedBpm ? clampTempoRatio(target / track.detectedBpm) : 1 })));
+                      }
+                    }}
+                    className="min-w-0 flex-1 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-xs font-mono text-white outline-none focus:border-[#a855f7]/60"
+                  />
+                  <span className="text-[9px] font-bold text-white/40">BPM</span>
+                  <button
+                    onClick={() => applyTempoTarget(globalSettings.tempoTarget || 120, true)}
+                    disabled={!tracks.some(track => track.detectedBpm)}
+                    className="rounded bg-[#a855f7]/15 px-2 py-1.5 text-[8px] font-black uppercase tracking-wider text-[#d8b4fe] hover:bg-[#a855f7]/25 disabled:opacity-30"
+                  >
+                    Matcha
+                  </button>
+                </div>
+                <p className="text-[8px] text-white/25">{tracks.filter(track => track.detectedBpm).length} av {tracks.length} musikspår har ett hittat tempo.</p>
+
+                <div className="pt-4 border-t border-white/5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex gap-3">
+                      <Wand2 size={15} className="mt-0.5 text-[#ec4899]" />
+                      <div>
+                        <h4 className="text-[10px] font-black uppercase tracking-widest">Smarta övergångar</h4>
+                        <p className="text-[9px] leading-4 text-white/35 mt-1">Letar efter lugna slut och tydliga starter i angränsande spår.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={analyseTransitions}
+                      disabled={isAnalysingTransitions || tracks.length < 2}
+                      className="rounded bg-[#ec4899]/15 px-2 py-1.5 text-[8px] font-black uppercase tracking-wider text-pink-200 hover:bg-[#ec4899]/25 disabled:opacity-30"
+                    >
+                      {isAnalysingTransitions ? 'Letar…' : 'Föreslå'}
+                    </button>
+                  </div>
+                  {transitionSuggestions.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {transitionSuggestions.slice(0, 2).map(suggestion => (
+                        <div key={suggestion.id} className="rounded-lg border border-white/5 bg-black/20 px-2 py-2">
+                          <p className="text-[8px] font-bold text-white/70 truncate">{suggestion.fromName} <span className="text-[#ec4899]">→</span> {suggestion.toName}</p>
+                          <p className="text-[8px] text-white/35 mt-1">{suggestion.suggestedCrossfade}s övergång · {suggestion.confidence === 'high' ? 'hög träff' : suggestion.confidence === 'medium' ? 'rimlig träff' : 'prova i förhandslyssning'}</p>
+                        </div>
+                      ))}
+                      {transitionSuggestions.length > 2 && <p className="text-[8px] text-white/30">+ {transitionSuggestions.length - 2} fler förslag</p>}
+                      <button
+                        onClick={applyTransitionSuggestions}
+                        className="w-full rounded border border-[#ec4899]/30 bg-[#ec4899]/10 px-2 py-2 text-[8px] font-black uppercase tracking-wider text-pink-100 hover:bg-[#ec4899]/20"
+                      >
+                        Använd alla förslag
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Automatic music ducking for voiceovers */}
+              <div
+                className="rounded-lg border border-cyan-400/10 bg-cyan-400/[0.035] p-4 cursor-pointer hover:border-cyan-400/30 transition-all"
+                onClick={() => setGlobalSettings(settings => ({ ...settings, autoDuck: !settings.autoDuck }))}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex gap-3">
+                    <Volume1 size={15} className="mt-0.5 text-cyan-300" />
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest">Sänk musik under röst</h4>
+                      <p className="text-[9px] text-white/35 mt-1">Bakgrunden blir lägre medan en berättarröst hörs.</p>
+                    </div>
+                  </div>
+                  <div className={`w-8 h-4 rounded-full relative transition-all ${globalSettings.autoDuck ? 'bg-cyan-400' : 'bg-white/10'}`}>
+                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${globalSettings.autoDuck ? 'left-4.5' : 'left-0.5'}`} />
+                  </div>
+                </div>
+                <div className="mt-3" onClick={event => event.stopPropagation()}>
+                  <div className="flex justify-between text-[8px] font-bold uppercase tracking-wider text-white/30 mb-1">
+                    <span>Hur mycket musiken sänks</span><span>{globalSettings.duckAmount || 12} dB</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="4"
+                    max="24"
+                    step="1"
+                    value={globalSettings.duckAmount || 12}
+                    onChange={event => setGlobalSettings(settings => ({ ...settings, duckAmount: Number(event.target.value) }))}
+                    className="w-full accent-cyan-300"
+                  />
+                </div>
+              </div>
+
               {/* Normalization */}
               <div 
                 onClick={() => setGlobalSettings(s => ({ ...s, normalize: !s.normalize }))}
@@ -1162,6 +1928,58 @@ export default function App() {
                 <div className={`w-8 h-4 rounded-full relative transition-all ${globalSettings.normalize ? 'bg-[#a855f7]' : 'bg-white/10'}`}>
                   <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${globalSettings.normalize ? 'left-4.5' : 'left-0.5'}`} />
                 </div>
+              </div>
+
+              {/* Export profile */}
+              <div className="space-y-4 pt-6 border-t border-white/5">
+                <div className="flex items-center gap-3">
+                  <FileText size={14} className="text-[#06b6d4]" />
+                  <div>
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Exportval</h3>
+                    <p className="text-[9px] text-white/35 mt-1">Välj vad filen främst ska användas till.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(EXPORT_PRESETS) as Array<keyof typeof EXPORT_PRESETS>).map(key => {
+                    const preset = EXPORT_PRESETS[key];
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => applyExportPreset(key)}
+                        className={`rounded-lg border px-2 py-2 text-left transition-all ${globalSettings.exportPreset === key ? 'border-[#06b6d4]/60 bg-[#06b6d4]/10 text-white' : 'border-white/5 bg-white/[0.03] text-white/55 hover:bg-white/10'}`}
+                      >
+                        <span className="block text-[8px] font-black uppercase tracking-wider">{preset.label}</span>
+                        <span className="block mt-1 text-[7px] leading-3 text-white/35">{preset.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-bold uppercase tracking-widest text-white/35">Filnamn</label>
+                  <input
+                    value={globalSettings.exportName || ''}
+                    onChange={event => setGlobalSettings(settings => ({ ...settings, exportName: event.target.value }))}
+                    placeholder="NoBreak_Project"
+                    maxLength={80}
+                    className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white outline-none focus:border-[#06b6d4]/60"
+                  />
+                </div>
+                {globalSettings.format === 'mp3' && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[8px] font-bold uppercase tracking-widest text-white/35">MP3-kvalitet</span>
+                    <div className="flex gap-1">
+                      {([128, 192, 320] as const).map(rate => (
+                        <button
+                          key={rate}
+                          onClick={() => setGlobalSettings(settings => ({ ...settings, mp3Bitrate: rate, exportPreset: undefined }))}
+                          className={`rounded px-2 py-1 text-[8px] font-black ${globalSettings.mp3Bitrate === rate ? 'bg-[#06b6d4] text-black' : 'bg-white/5 text-white/45 hover:bg-white/10'}`}
+                        >
+                          {rate}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Visuals Selection */}
@@ -1246,6 +2064,58 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {/* Chapters and pre-export report */}
+            <section className="rounded-2xl border border-white/5 bg-brand-panel p-5 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <ListMusic size={15} className="text-[#06b6d4]" />
+                  <div>
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.18em] text-white">Kapitel & låtlista</h3>
+                    <p className="text-[9px] text-white/35 mt-1">Tider följer den färdiga mixen.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={downloadChapters}
+                  disabled={!chapterEntries.length}
+                  className="rounded bg-white/5 px-2 py-1.5 text-[8px] font-black uppercase tracking-wider text-white/65 hover:bg-white/10 disabled:opacity-30 flex items-center gap-1"
+                >
+                  <Download size={11} /> TXT
+                </button>
+              </div>
+              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                {chapterEntries.length ? chapterEntries.map(entry => (
+                  <div key={entry.track.id} className="flex gap-2 text-[9px] leading-4">
+                    <span className="font-mono text-[#06b6d4]">{formatTime(entry.start).slice(0, 5)}</span>
+                    <span className="truncate text-white/60">{entry.track.chapterTitle?.trim() || entry.track.name}</span>
+                  </div>
+                )) : <p className="text-[9px] text-white/30">Lägg till musikspår och välj ”Med” på respektive spår.</p>}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-white/5 bg-brand-panel p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <BadgeCheck size={15} className={qualityIssues.some(issue => issue.severity === 'error') ? 'text-red-300' : qualityIssues.length ? 'text-amber-300' : 'text-green-300'} />
+                  <div>
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.18em] text-white">Kontroll före export</h3>
+                    <p className="text-[9px] text-white/35 mt-1">Hittar tystnad, nivåer, tempo och röstöverlägg innan filen sparas.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { runQualityCheck(); setShowQualityModal(true); }}
+                  disabled={!tracks.length}
+                  className="rounded bg-[#a855f7]/15 px-2 py-1.5 text-[8px] font-black uppercase tracking-wider text-[#d8b4fe] hover:bg-[#a855f7]/25 disabled:opacity-30"
+                >
+                  Kontrollera
+                </button>
+              </div>
+              {qualityCheckedAt && (
+                <p className={`mt-3 text-[9px] ${qualityIssues.length ? 'text-amber-200/80' : 'text-green-200/80'}`}>
+                  {qualityIssues.length ? `${qualityIssues.length} sak${qualityIssues.length === 1 ? '' : 'er'} att titta på` : 'Allt ser klart ut för export.'}
+                </p>
+              )}
+            </section>
             
             <div className="flex flex-col gap-1 px-4 text-center">
                <div className="text-sm font-black italic uppercase tracking-tighter bg-[linear-gradient(90deg,white_48%,#ec4899_50%,white_52%)] bg-clip-text text-transparent animate-shimmer">Professional Audio Seamless</div>
@@ -1308,25 +2178,20 @@ export default function App() {
                    
                    {/* Track Markers */}
                    <div className="absolute inset-0 h-1.5 my-auto pointer-events-none">
-                      {tracks.map((t, idx) => {
-                         if (idx === 0) return null;
-                         
-                         let acc = 0;
-                         for(let j=0; j<idx; j++) {
-                            const dur = tracks[j].buffer?.duration || 0;
-                            const start = j === 0 ? 0 : acc - globalSettings.crossfadeDuration;
-                            acc = start + dur;
-                         }
-                         const trackStartTime = acc - globalSettings.crossfadeDuration;
-                         
-                         const x = (trackStartTime / (previewBuffer?.duration || totalDuration || 1)) * 100;
+                      {projectTimeline.entries.filter(entry => entry.kind === 'sequence' && entry.start > 0).map(entry => {
+                         const x = (entry.start / (previewBuffer?.duration || totalDuration || 1)) * 100;
                          return (
-                            <div 
-                              key={t.id} 
-                              className="absolute h-4 w-px bg-white/40 top-1/2 -translate-y-1/2 z-10" 
+                            <div
+                              key={entry.track.id}
+                              title={entry.track.chapterTitle || entry.track.name}
+                              className="absolute h-4 w-px bg-white/40 top-1/2 -translate-y-1/2 z-10"
                               style={{ left: `${x}%` }}
                             />
                          );
+                      })}
+                      {projectTimeline.entries.filter(entry => entry.kind === 'overlay').map(entry => {
+                        const x = (entry.start / (previewBuffer?.duration || totalDuration || 1)) * 100;
+                        return <div key={entry.track.id} className="absolute h-2 w-2 rounded-full bg-cyan-300 top-1/2 -translate-y-1/2 z-10" style={{ left: `${x}%` }} title={`Röst: ${entry.track.name}`} />;
                       })}
                    </div>
 
@@ -1345,21 +2210,135 @@ export default function App() {
              <div className="flex flex-col items-end min-w-[200px]">
                 <span className="text-[10px] text-white/40 uppercase font-bold">Now Playing</span>
                 <span className="text-sm font-black italic truncate max-w-[200px]">
-                   {(() => {
-                      let acc = 0;
-                      for (let i = 0; i < tracks.length; i++) {
-                        const dur = tracks[i].buffer?.duration || 0;
-                        const start = i === 0 ? 0 : acc - globalSettings.crossfadeDuration;
-                        const end = start + dur;
-                        if (currentTime >= start && currentTime < end) {
-                           return tracks[i].name;
-                        }
-                        acc = end;
-                      }
-                      return tracks[tracks.length-1]?.name || "Mix Output";
-                   })()}
+                   {projectTimeline.entries
+                     .filter(entry => entry.kind === 'overlay' && currentTime >= entry.start && currentTime < entry.end)
+                     .map(entry => `Röst: ${entry.track.name}`)[0]
+                     || projectTimeline.entries
+                       .filter(entry => entry.kind === 'sequence')
+                       .find(entry => currentTime >= entry.start && currentTime < entry.end)?.track.name
+                     || tracks[tracks.length - 1]?.name
+                     || 'Mix Output'}
                 </span>
              </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Quality check and version history */}
+      <AnimatePresence>
+        {showQualityModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[220] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+            onMouseDown={() => setShowQualityModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              onMouseDown={event => event.stopPropagation()}
+              className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-[#12141C] shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-white/5 p-6">
+                <div className="flex gap-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${qualityIssues.some(issue => issue.severity === 'error') ? 'bg-red-400/10 text-red-300' : qualityIssues.length ? 'bg-amber-400/10 text-amber-200' : 'bg-green-400/10 text-green-300'}`}>
+                    {qualityIssues.length ? <AlertTriangle size={19} /> : <CheckCircle2 size={19} />}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Kontroll före export</h3>
+                    <p className="mt-1 text-xs text-white/45">
+                      {qualityIssues.length ? 'Gå gärna igenom punkterna innan du sparar den färdiga filen.' : 'Allt ser bra ut. Mixen är klar att exportera.'}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setShowQualityModal(false)} className="rounded p-1 text-white/35 hover:bg-white/5 hover:text-white" aria-label="Stäng kontrollen"><X size={18} /></button>
+              </div>
+              <div className="max-h-[50vh] space-y-2 overflow-y-auto p-6">
+                {qualityIssues.length ? qualityIssues.map(issue => (
+                  <div key={issue.id} className={`rounded-xl border p-3 ${issue.severity === 'error' ? 'border-red-400/20 bg-red-400/[0.06]' : 'border-amber-400/15 bg-amber-400/[0.04]'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider ${issue.severity === 'error' ? 'bg-red-400/15 text-red-200' : 'bg-amber-400/15 text-amber-100'}`}>{issue.severity === 'error' ? 'Viktigt' : 'Tips'}</span>
+                      <h4 className="text-xs font-bold text-white">{issue.title}</h4>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-white/50">{issue.detail}</p>
+                  </div>
+                )) : (
+                  <div className="rounded-xl border border-green-400/15 bg-green-400/[0.04] p-5 text-center">
+                    <CheckCircle2 className="mx-auto mb-2 text-green-300" size={22} />
+                    <p className="text-xs font-semibold text-green-100">Inga tydliga problem hittades.</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col-reverse gap-2 border-t border-white/5 p-5 sm:flex-row sm:justify-end">
+                <button onClick={() => setShowQualityModal(false)} className="rounded-lg bg-white/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white/65 hover:bg-white/10">Tillbaka till mixen</button>
+                <button
+                  onClick={() => { setShowQualityModal(false); void handleExport(true); }}
+                  disabled={qualityIssues.some(issue => issue.severity === 'error')}
+                  className="rounded-lg bg-[#06b6d4] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-black hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/25"
+                >
+                  {qualityIssues.some(issue => issue.severity === 'error') ? 'Åtgärda viktiga punkter' : qualityIssues.length ? 'Exportera ändå' : 'Exportera nu'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showHistory && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[220] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+            onMouseDown={() => setShowHistory(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              onMouseDown={event => event.stopPropagation()}
+              className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#12141C] shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-white/5 p-6">
+                <div className="flex gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#a855f7]/10 text-[#d8b4fe]"><History size={19} /></div>
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white">Tidigare versioner</h3>
+                    <p className="mt-1 text-xs text-white/45">Spara ett läge före större ändringar och gå tillbaka när du vill.</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowHistory(false)} className="rounded p-1 text-white/35 hover:bg-white/5 hover:text-white" aria-label="Stäng versionshistoriken"><X size={18} /></button>
+              </div>
+              <div className="max-h-[50vh] overflow-y-auto p-5">
+                <button
+                  onClick={() => captureSnapshot('Manuell version')}
+                  disabled={!tracks.length}
+                  className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#a855f7]/30 bg-[#a855f7]/10 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-[#e9d5ff] hover:bg-[#a855f7]/20 disabled:opacity-30"
+                >
+                  <Save size={14} /> Spara aktuell version
+                </button>
+                {snapshots.length ? <div className="space-y-2">
+                  {snapshots.map(snapshot => (
+                    <div key={snapshot.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-black/20 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold text-white">{snapshot.label}</p>
+                        <p className="mt-1 text-[9px] text-white/35">{new Date(snapshot.createdAt).toLocaleString('sv-SE')} · {snapshot.tracks.length} spår</p>
+                      </div>
+                      <button
+                        onClick={() => restoreSnapshot(snapshot.id)}
+                        className="shrink-0 rounded-lg bg-white/5 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-white/75 hover:bg-white/10 flex items-center gap-1"
+                      >
+                        <RotateCcw size={12} /> Återställ
+                      </button>
+                    </div>
+                  ))}
+                </div> : <p className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-white/35">Inga sparade versioner ännu.</p>}
+              </div>
+              <p className="border-t border-white/5 px-6 py-4 text-[9px] leading-relaxed text-white/35">Versionerna behåller dina uppladdade filer under den här öppna arbetsstunden. Inställningarna sparas också lokalt för nästa gång.</p>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
