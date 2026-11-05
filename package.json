@@ -1,7 +1,7 @@
 {
   "name": "nobreak-audio-builder",
   "private": true,
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Professional audio mixing and merging tool for Windows",
   "repository": "https://github.com/nRn-World/NOBreak-Audio-Builder",
   "license": "SEE LICENSE IN LICENSE.txt",
@@ -17,6 +17,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "test:audio": "node --import tsx --test src/utils/audio.timeline.test.ts",
     "dev:electron": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
     "build:electron:win": "npm run build && electron-builder --win",
     "build:electron:mac": "npm run build && electron-builder --mac",

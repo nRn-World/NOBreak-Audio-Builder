@@ -15,9 +15,119 @@ const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 const dbToGain = (db: number) => Math.pow(10, -Math.abs(db) / 20);
 
+// NOBREAK keeps a small overlap even if a project is set to a zero-second
+// crossfade. That removes digital gaps while still feeling like a direct cut.
+const MIN_GAPLESS_OVERLAP = 0.35;
+const MIN_HARD_SILENCE_SECONDS = 0.18;
+
+export interface TrackPlaybackRegion {
+  /** Start and end in the original source file after manual and safe automatic trimming. */
+  sourceStart: number;
+  sourceEnd: number;
+  sourceDuration: number;
+  playbackDuration: number;
+  autoLeadingSilence: number;
+  autoTrailingSilence: number;
+}
+
+interface EdgeSilence {
+  leading: number;
+  trailing: number;
+}
+
+const edgeSilenceCache = new WeakMap<AudioBuffer, EdgeSilence>();
+
 export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
   const arrayBuffer = await file.arrayBuffer();
   return await audioCtx.decodeAudioData(arrayBuffer);
+}
+
+/**
+ * Finds only near-digital silence at a file's edges. The deliberately low
+ * threshold keeps musical intros and natural fade-outs intact, while removing
+ * the empty padding that otherwise creates a gap between two songs.
+ */
+function getHardEdgeSilence(buffer: AudioBuffer): EdgeSilence {
+  const cached = edgeSilenceCache.get(buffer);
+  if (cached) return cached;
+
+  const windows = getEnergyWindows(buffer, 0, buffer.duration, 0.025, 8000);
+  if (!windows.length) {
+    const empty = { leading: 0, trailing: 0 };
+    edgeSilenceCache.set(buffer, empty);
+    return empty;
+  }
+
+  const loudest = Math.max(...windows.map(window => window.energy), 0);
+  // The floor tolerates the tiny amount of codec noise common in MP3 files,
+  // while the cap avoids treating a naturally quiet musical passage as empty.
+  const threshold = Math.max(0.00045, Math.min(0.004, loudest * 0.008));
+  const firstAudible = windows.findIndex(window => window.energy > threshold);
+  const lastAudible = (() => {
+    for (let index = windows.length - 1; index >= 0; index--) {
+      if (windows[index].energy > threshold) return index;
+    }
+    return -1;
+  })();
+
+  // A fully silent file is left as-is so the quality checker can report it.
+  if (firstAudible === -1 || lastAudible === -1) {
+    const empty = { leading: 0, trailing: 0 };
+    edgeSilenceCache.set(buffer, empty);
+    return empty;
+  }
+
+  const windowLength = windows.length > 1
+    ? windows[1].time - windows[0].time
+    : Math.min(0.025, buffer.duration);
+  const rawLeading = firstAudible > 0 ? windows[firstAudible].time : 0;
+  const rawTrailing = lastAudible < windows.length - 1
+    ? Math.max(0, buffer.duration - (windows[lastAudible].time + windowLength))
+    : 0;
+  const edge = {
+    leading: rawLeading >= MIN_HARD_SILENCE_SECONDS ? rawLeading : 0,
+    trailing: rawTrailing >= MIN_HARD_SILENCE_SECONDS ? rawTrailing : 0,
+  };
+  edgeSilenceCache.set(buffer, edge);
+  return edge;
+}
+
+/**
+ * The playable part of a source. Manual trims always win; automatic trimming
+ * only removes clear empty padding at the beginning and end of a file.
+ */
+export function getTrackPlaybackRegion(track: TrackSettings): TrackPlaybackRegion {
+  if (!track.buffer) {
+    return {
+      sourceStart: 0,
+      sourceEnd: 0,
+      sourceDuration: 0,
+      playbackDuration: 0,
+      autoLeadingSilence: 0,
+      autoTrailingSilence: 0,
+    };
+  }
+
+  const buffer = track.buffer;
+  const manualStart = clamp(track.startTrim || 0, 0, Math.max(0, buffer.duration - 0.05));
+  const manualEnd = clamp(track.endTrim || 0, 0, Math.max(0, buffer.duration - manualStart - 0.05));
+  const edgeSilence = getHardEdgeSilence(buffer);
+  const automaticStart = Math.max(0, edgeSilence.leading - manualStart);
+  const automaticEnd = Math.max(0, edgeSilence.trailing - manualEnd);
+  const sourceStart = clamp(manualStart + automaticStart, 0, Math.max(0, buffer.duration - 0.05));
+  const latestEnd = Math.max(sourceStart + 0.05, buffer.duration - manualEnd - automaticEnd);
+  const sourceEnd = clamp(latestEnd, sourceStart + 0.05, buffer.duration);
+  const sourceDuration = Math.max(0.05, sourceEnd - sourceStart);
+  const playbackDuration = sourceDuration / getTrackPlaybackRate(track);
+
+  return {
+    sourceStart,
+    sourceEnd,
+    sourceDuration,
+    playbackDuration,
+    autoLeadingSilence: automaticStart,
+    autoTrailingSilence: automaticEnd,
+  };
 }
 
 /**
@@ -25,10 +135,7 @@ export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
  * duration can be different when tempo matching is active.
  */
 export function getTrackSourceDuration(track: TrackSettings): number {
-  if (!track.buffer) return 0;
-  const startTrim = clamp(track.startTrim || 0, 0, Math.max(0, track.buffer.duration - 0.05));
-  const endTrim = clamp(track.endTrim || 0, 0, Math.max(0, track.buffer.duration - startTrim - 0.05));
-  return Math.max(0.05, track.buffer.duration - startTrim - endTrim);
+  return getTrackPlaybackRegion(track).sourceDuration;
 }
 
 export function getTrackPlaybackRate(track: TrackSettings): number {
@@ -37,7 +144,7 @@ export function getTrackPlaybackRate(track: TrackSettings): number {
 }
 
 export function getTrackPlaybackDuration(track: TrackSettings): number {
-  return getTrackSourceDuration(track) / getTrackPlaybackRate(track);
+  return getTrackPlaybackRegion(track).playbackDuration;
 }
 
 export function getTransitionDuration(
@@ -46,9 +153,14 @@ export function getTransitionDuration(
   settings: GlobalSettings,
 ): number {
   const requested = from.transitionDuration ?? settings.crossfadeDuration;
-  if (!Number.isFinite(requested) || requested <= 0) return 0;
   const safeMaximum = Math.min(getTrackPlaybackDuration(from), getTrackPlaybackDuration(to)) * 0.45;
-  return clamp(requested, 0, safeMaximum);
+  if (!Number.isFinite(requested) || safeMaximum <= 0) return 0;
+
+  const musicToMusic = (from.role ?? 'music') !== 'voice' && (to.role ?? 'music') !== 'voice';
+  // A minimum protection overlap is what makes a NOBREAK mix truly gapless.
+  // Voice tracks retain their explicitly requested timing instead.
+  const desired = musicToMusic ? Math.max(MIN_GAPLESS_OVERLAP, requested) : Math.max(0, requested);
+  return clamp(desired, 0, safeMaximum);
 }
 
 /** Returns the shared project clock used by preview, chapters and export. */
@@ -480,8 +592,9 @@ function getVoiceActivityRanges(entry: TimelineEntry): TimeRange[] {
   const { track } = entry;
   if (!track.buffer) return [];
   const buffer = track.buffer;
-  const trimStart = clamp(track.startTrim || 0, 0, buffer.duration);
-  const trimEnd = clamp(buffer.duration - (track.endTrim || 0), trimStart, buffer.duration);
+  const region = getTrackPlaybackRegion(track);
+  const trimStart = region.sourceStart;
+  const trimEnd = region.sourceEnd;
   const windows = getEnergyWindows(buffer, trimStart, trimEnd, 0.035, 5000);
   if (!windows.length) return [];
 
@@ -530,6 +643,18 @@ function scheduleDucking(gain: GainNode, ranges: TimeRange[], amountDb: number, 
     gain.gain.setValueAtTime(duckedValue, end);
     gain.gain.linearRampToValueAtTime(1, Math.min(totalDuration, end + release));
   }
+}
+
+function equalPowerCurve(baseGain: number, direction: 'in' | 'out'): Float32Array {
+  const points = 128;
+  const curve = new Float32Array(points);
+  for (let index = 0; index < points; index++) {
+    const progress = index / (points - 1);
+    curve[index] = direction === 'in'
+      ? baseGain * Math.sin(progress * Math.PI / 2)
+      : baseGain * Math.cos(progress * Math.PI / 2);
+  }
+  return curve;
 }
 
 export async function renderMix(
@@ -587,23 +712,35 @@ export async function renderMix(
 
     const fadeGain = offlineCtx.createGain();
     const baseGain = clamp(track.volume, 0, 2);
+    const isCrossfadingIn = entry.kind === 'sequence' && (entry.previousTransition || 0) > 0;
+    const isCrossfadingOut = entry.kind === 'sequence' && (entry.nextTransition || 0) > 0;
     const fadeIn = Math.min(
-      entry.previousTransition || track.fadeIn || 0,
+      isCrossfadingIn ? entry.previousTransition || 0 : track.fadeIn || 0,
       entry.duration * 0.45,
     );
     const fadeOut = Math.min(
-      entry.nextTransition || track.fadeOut || 0,
+      isCrossfadingOut ? entry.nextTransition || 0 : track.fadeOut || 0,
       entry.duration * 0.45,
     );
     const fadeOutStart = Math.max(entry.start + fadeIn, entry.end - fadeOut);
 
     fadeGain.gain.setValueAtTime(fadeIn > 0 ? 0 : baseGain, entry.start);
     if (fadeIn > 0) {
-      fadeGain.gain.linearRampToValueAtTime(baseGain, entry.start + fadeIn);
+      if (isCrossfadingIn) {
+        // Equal-power curves preserve the perceived energy through a handoff,
+        // avoiding the dip that a pair of linear fades can introduce.
+        fadeGain.gain.setValueCurveAtTime(equalPowerCurve(baseGain, 'in'), entry.start, fadeIn);
+      } else {
+        fadeGain.gain.linearRampToValueAtTime(baseGain, entry.start + fadeIn);
+      }
     }
     fadeGain.gain.setValueAtTime(baseGain, fadeOutStart);
     if (fadeOut > 0) {
-      fadeGain.gain.linearRampToValueAtTime(0, entry.end);
+      if (isCrossfadingOut) {
+        fadeGain.gain.setValueCurveAtTime(equalPowerCurve(baseGain, 'out'), fadeOutStart, fadeOut);
+      } else {
+        fadeGain.gain.linearRampToValueAtTime(0, entry.end);
+      }
     }
 
     lastNode.connect(fadeGain);
@@ -617,8 +754,8 @@ export async function renderMix(
       fadeGain.connect(offlineCtx.destination);
     }
 
-    const startTrim = clamp(track.startTrim || 0, 0, buffer.duration);
-    source.start(entry.start, startTrim, getTrackSourceDuration(track));
+    const playableRegion = getTrackPlaybackRegion(track);
+    source.start(entry.start, playableRegion.sourceStart, playableRegion.sourceDuration);
   }
 
   return await offlineCtx.startRendering();
