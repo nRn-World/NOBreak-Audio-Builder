@@ -1,7 +1,7 @@
 {
   "name": "nobreak-audio-builder",
   "private": true,
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Professional audio mixing and merging tool for Windows",
   "repository": "https://github.com/nRn-World/NOBreak-Audio-Builder",
   "license": "SEE LICENSE IN LICENSE.txt",
@@ -88,7 +88,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "NoBreak Audio Builder",
-      "license": "LICENSE.txt"
+      "license": "LICENSE.txt",
+      "installerSidebar": "assets/installer/installer-sidebar.bmp",
+      "uninstallerSidebar": "assets/installer/uninstaller-sidebar.bmp"
     },
     "files": [
       "dist/**/*",
